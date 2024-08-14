@@ -106,6 +106,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AisMessage.cs" />
+    <Compile Include="GMapMarkerImage.cs" />
+    <Compile Include="HistoryMarker.cs" />
     <Compile Include="ShipMarker.cs" />
     <Compile Include="GeoUtils.cs" />
     <Compile Include="DroneMarker.cs" />
@@ -154,6 +156,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\Images\container.png" />
+    <EmbeddedResource Include="Resources\Images\ieraxlogo.png" />
+    <EmbeddedResource Include="Resources\Images\selection.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="Mavlink\MAVLink.csproj">

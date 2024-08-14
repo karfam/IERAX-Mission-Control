@@ -124,4 +124,10 @@
   <data name="droneMarker" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Images\droneMarker.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="ieraxlogo" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Images\ieraxlogo.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="selection" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Images\selection.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>

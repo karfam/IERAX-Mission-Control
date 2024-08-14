@@ -17,6 +17,8 @@ using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using IERAX_MissionControl;
+using static GMap.NET.Entity.OpenStreetMapGraphHopperRouteEntity;
+using IERAX_MissionControl.Properties;
 
 
 namespace IERAX_MissionControl
@@ -38,7 +40,10 @@ namespace IERAX_MissionControl
         private bool isMapCentered = false; // Flag to track if the map has been centered
         private ClientWebSocket ws;
         private Dictionary<string, GMapMarker> shipMarkers = new Dictionary<string, GMapMarker>();
+        private Panel infoPanel;
+        private Label infoLabel;
 
+        private Dictionary<string, AisData> cachedAisData = new Dictionary<string, AisData>();
 
         private CancellationTokenSource cts;
 
@@ -46,14 +51,22 @@ namespace IERAX_MissionControl
         {
             InitializeComponent();
             InitializeMap();
+            InitializeInfoPanel();
             InitializeWebSocket();
+           
+            // Attach resize event
+            this.Resize += Form1_Resize;
 
         }
 
+
+        private void gMapControl1_Load(object sender, EventArgs e)
+        {
+    
+        }
         private void InitializeMap()
         {
             ConfigureMap();
-
 
             // Create a marker overlay and add it to the map
             markersOverlay = new GMapOverlay("markers");
@@ -65,6 +78,47 @@ namespace IERAX_MissionControl
 
             // Refresh the map to ensure the marker is displayed
             gMapControl1.Refresh();
+
+        }
+
+        private void Form1_Resize(object sender, EventArgs e)
+        {
+            PositionInfoPanel();
+        }
+
+        private void InitializeInfoPanel()
+        {
+            // Initialize the panel
+            infoPanel = new Panel
+            {
+                Size = new Size(200, 100),
+                BackColor = Color.FromArgb(200, 255, 255, 255), // Semi-transparent white
+                BorderStyle = BorderStyle.FixedSingle,
+                Visible = false
+            };
+
+            // Initialize the label to display information
+            infoLabel = new Label
+            {
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(10),
+            };
+
+            infoPanel.Controls.Add(infoLabel);
+
+            // Add the panel to the form or gMapControl
+            this.Controls.Add(infoPanel);
+
+            // Position the panel in the top-right corner of the map
+            PositionInfoPanel();
+        }
+
+        private void PositionInfoPanel()
+        {
+            // Position the panel in the top-right corner of the gMapControl
+            infoPanel.Location = new Point(gMapControl1.Width - infoPanel.Width - 10, 50);
+            infoPanel.BringToFront();
         }
 
         private async void InitializeWebSocket()
@@ -121,59 +175,6 @@ namespace IERAX_MissionControl
             }
         }
 
-        private void UpdateShipPosition(AisData aisData)
-        {
-            Invoke(new Action(() =>
-            {
-                double latitude = aisData.MetaData.Latitude;
-                double longitude = aisData.MetaData.Longitude;
-                string mmsi = aisData.MetaData.MMSI;
-                string shipName = aisData.MetaData.ShipName;
-
-                PointLatLng point = new PointLatLng(latitude, longitude);
-                Console.WriteLine($"Updating ship: {shipName} at {latitude}, {longitude}");
-
-                if (shipMarkers.ContainsKey(mmsi))
-                {
-                    // Update existing marker position
-                    shipMarkers[mmsi].Position = point;
-                }
-                else
-                {
-                    // Create a new marker for the ship with the custom image
-                    ShipMarker shipMarker = new IERAX_MissionControl.ShipMarker(point)
-                    {
-                        ToolTipText = shipName,
-                        Tag = mmsi,
-                        ShipName = shipName,
-                        MMSI = mmsi
-                    };
-                    shipMarker.ToolTipMode = MarkerTooltipMode.OnMouseOver;
-
-                    markersOverlay.Markers.Add(shipMarker);
-                    shipMarkers.Add(mmsi, shipMarker);
-                }
-
-                // Refresh the overlay to ensure the marker is rendered on top
-                markersOverlay.IsVisibile = true;
-                markersOverlay.IsVisibile = false;
-                markersOverlay.IsVisibile = true;
-            }));
-        }
-
-
-        private void ShowShipInfo(ShipMarker marker)
-        {
-            if (marker != null)
-            {
-                string info = $"Ship Name: {marker.ShipName}\nMMSI: {marker.MMSI}";
-                MessageBox.Show(info, "Ship Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-
-
-
 
         private void ConfigureMap()
         {
@@ -185,7 +186,21 @@ namespace IERAX_MissionControl
             gMapControl1.Manager.Mode = AccessMode.ServerAndCache;
             gMapControl1.DragButton = MouseButtons.Left;
 
-            gMapControl1.OnMarkerClick += new MarkerClick(gMapControl1_OnMarkerClick);
+     
+            gMapControl1.MouseUp += new MouseEventHandler(gMapControl1_MouseUp);
+
+
+            // Refresh the map to ensure the marker is displayed
+            gMapControl1.Refresh();
+
+        }
+
+        private void MarkersOverlay_OnMarkerClick(GMapMarker item, MouseEventArgs e)
+        {
+            if (item is ShipMarker shipMarker)
+            {
+                ShowShipInfo(shipMarker);
+            }
         }
 
         private void but_connect_Click(object sender, EventArgs e)
@@ -455,26 +470,280 @@ namespace IERAX_MissionControl
             }));
         }
 
-        private void gMapControl1_OnMarkerClick(GMapMarker item, MouseEventArgs e)
+  
+
+        private void gMapControl1_MouseUp(object sender, MouseEventArgs e)
+
         {
-            if (item is ShipMarker shipMarker)
+            if (e.Button == MouseButtons.Left)
             {
-                if (item != null)
+                Console.WriteLine("Pressed Left Click");
+
+                // Convert the mouse click position to the map's coordinate system
+                var clickLocation = gMapControl1.FromLocalToLatLng(e.X, e.Y);
+
+                foreach (var marker in markersOverlay.Markers)
                 {
-                    string info = $"Ship Name: {shipMarker.ShipName}\nMMSI: {shipMarker.MMSI}";
-                    MessageBox.Show(info, "Ship Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Calculate the size of the marker on the map
+                    var markerSize = new Size(50, 50); // Assuming the marker's size is 50x50
+                    var markerScreenPosition = gMapControl1.FromLatLngToLocal(marker.Position);
+
+                    Rectangle markerRect = new Rectangle(
+                        (int)(markerScreenPosition.X - markerSize.Width / 2),
+                        (int)(markerScreenPosition.Y - markerSize.Height / 2),
+                        markerSize.Width,
+                        markerSize.Height
+                    );
+
+                    // Check if the click was within the marker's area
+                    if (markerRect.Contains(e.Location))
+                    {
+                        Console.WriteLine("Pressed Left Click on marker");
+                        if (marker is ShipMarker shipMarker)
+                        {
+                            ShowShipInfo(shipMarker);
+                        }
+                        break; // Exit the loop after finding the clicked marker
+                    }
                 }
+            }
+
+            if (e.Button == MouseButtons.Right)
+            {
+                // Get the latitude and longitude of the point clicked
+                PointLatLng point = gMapControl1.FromLocalToLatLng(e.X, e.Y);
+
+                // Optionally, you can show a context menu or perform some other action
+                ShowRightClickMenu(point, e.Location);
+            }
+        }
+
+        private void ShowRightClickMenu(PointLatLng point, Point location)
+        {
+            ContextMenuStrip contextMenu = new ContextMenuStrip();
+
+            // Add items to the context menu
+            contextMenu.Items.Add($"Latitude: {point.Lat:F6}, Longitude: {point.Lng:F6}", null);
+            // Add other menu items and handle their Click events as needed
+
+            // Show the context menu at the mouse position
+            contextMenu.Show(gMapControl1, location);
+        }
+
+
+
+        private void UpdateShipPosition(AisData aisData)
+        {
+            Invoke(new Action(() =>
+            {
+                try
+                {
+                    string mmsi = aisData.MetaData.MMSI;
+                    string shipName = aisData.MetaData.ShipName;
+                    double latitude = aisData.MetaData.Latitude;
+                    double longitude = aisData.MetaData.Longitude;
+                    double heading = 0;
+                    double speed = 0;
+                    string vesselType = "Unknown";
+
+                    PointLatLng currentPosition = new PointLatLng(latitude, longitude);
+
+                    // Check for StandardClassBPositionReport
+                    if (aisData.Message.StandardClassBPositionReport != null)
+                    {
+                        var report = aisData.Message.StandardClassBPositionReport;
+
+                        // Parse the COG, SOG, and TrueHeading
+                        heading = report.Cog;
+                        speed = report.Sog;
+
+                        Console.WriteLine($"Parsed COG for ship {mmsi}: {heading} degrees.");
+                        Console.WriteLine($"Parsed SOG for ship {mmsi}: {speed} knots.");
+
+                        // Handle TrueHeading if it's not 511 (unavailable)
+                        if (report.TrueHeading != 511)
+                        {
+                            heading = report.TrueHeading;
+                            Console.WriteLine($"Parsed TrueHeading for ship {mmsi}: {heading} degrees.");
+                        }
+                    }
+                    // Check for PositionReport (or any other relevant message type)
+                    else if (aisData.Message.PositionReport != null)
+                    {
+                        var report = aisData.Message.PositionReport;
+
+                        // Parse the COG, SOG, and TrueHeading
+                        heading = report.Cog;
+                        speed = report.Sog;
+
+                        Console.WriteLine($"Parsed COG for ship {mmsi}: {heading} degrees.");
+                        Console.WriteLine($"Parsed SOG for ship {mmsi}: {speed} knots.");
+
+                        // Handle TrueHeading if it's not 511 (unavailable)
+                        if (report.TrueHeading != 511)
+                        {
+                            heading = report.TrueHeading;
+                            Console.WriteLine($"Parsed TrueHeading for ship {mmsi}: {heading} degrees.");
+                        }
+                    }
+                    else
+                    {
+                        // If no relevant position report is found, log a message
+                        Console.WriteLine($"No recognized position report found for ship {mmsi}.");
+                        return; // Exit the method early since there's no position data to update
+                    }
+
+                    // Proceed with the marker update as before
+                    if (cachedAisData.ContainsKey(mmsi))
+                    {
+                        var shipMarker = shipMarkers[mmsi] as ShipMarker;
+                        if (shipMarker != null && shipMarker.PreviousPosition.HasValue)
+                        {
+                            heading = CalculateBearing(shipMarker.PreviousPosition.Value, currentPosition);
+                            Console.WriteLine($"Calculating heading for {shipName} (MMSI: {mmsi}). Previous Position: Lat {shipMarker.PreviousPosition.Value.Lat}, Lng {shipMarker.PreviousPosition.Value.Lng}. Current Position: Lat {currentPosition.Lat}, Lng {currentPosition.Lng}. Calculated Heading: {heading} degrees");
+
+                            shipMarker.PreviousPosition = currentPosition;
+                        }
+                    }
+                    else
+                    {
+                        // If no cached data exists, this is the first position update
+                        shipMarkers[mmsi] = new ShipMarker(currentPosition)
+                        {
+                            ToolTipText = shipName,
+                            Tag = mmsi,
+                            ShipName = shipName,
+                            MMSI = mmsi,
+                            Heading = heading,
+                            Speed = speed,
+                            VesselType = vesselType,
+                            PreviousPosition = currentPosition
+                        };
+                        shipMarkers[mmsi].ToolTipMode = MarkerTooltipMode.OnMouseOver;
+                        markersOverlay.Markers.Add(shipMarkers[mmsi]);
+                    }
+
+                    // Cache the latest AISData for future use
+                    cachedAisData[mmsi] = aisData;
+
+                    PointLatLng point = new PointLatLng(latitude, longitude);
+                    Console.WriteLine($"Updating ship {mmsi} marker at: {latitude}, {longitude}");
+
+                    if (shipMarkers.ContainsKey(mmsi))
+                    {
+                        var shipMarker = shipMarkers[mmsi] as ShipMarker;
+                        if (shipMarker != null)
+                        {
+                            HistoryMarker historyMarker = new HistoryMarker(shipMarker.Position);
+                            shipMarker.HistoryMarkers.Add(historyMarker);
+
+                            markersOverlay.Markers.Add(historyMarker);
+
+                            DateTime tenMinutesAgo = DateTime.Now.AddMinutes(-10);
+                            shipMarker.HistoryMarkers.RemoveAll(h => (DateTime.Now - tenMinutesAgo).TotalMinutes > 10);
+
+                            shipMarker.Position = point;
+                            shipMarker.Heading = heading;
+                            shipMarker.Speed = speed;
+                            shipMarker.VesselType = vesselType;
+
+                            // Clear all existing projected markers from the overlay
+                            foreach (var projectedMarker in shipMarker.ProjectedMarkers)
+                            {
+                                markersOverlay.Markers.Remove(projectedMarker);
+                            }
+
+                            // Update projected markers with new positions
+                            shipMarker.UpdateProjectedMarkers();
+
+                            // Add the new set of projected markers to the overlay
+                            foreach (var projectedMarker in shipMarker.ProjectedMarkers)
+                            {
+                                markersOverlay.Markers.Add(projectedMarker);
+                            }
+                        }
+                    }
+
+                    markersOverlay.IsVisibile = true;
+                    markersOverlay.IsVisibile = false;
+                    markersOverlay.IsVisibile = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Exception encountered: {ex.Message}");
+                    Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                }
+            }));
+        }
+
+
+
+
+
+
+
+
+        private void ShowShipInfo(ShipMarker marker)
+        {
+            if (marker != null)
+            {
+                string info = $"Ship Name: {marker.ShipName}\n" +
+                              $"MMSI: {marker.MMSI}\n" +
+                              $"Heading: {(marker.Heading == 511 ? "Not Available" : $"{marker.Heading}°")}\n" +
+                              $"Speed: {marker.Speed} knots\n" +
+                              $"Vessel Type: {marker.VesselType}";
+
+                // Display ship information in the info panel
+                infoLabel.Text = info;
+                infoPanel.Visible = true;
+
+                // Draw a circle around the ship marker using an image
+                DrawCircleImageAroundMarker(marker);
             }
         }
 
 
-
-        private void gMapControl1_Load(object sender, EventArgs e)
+        private void DrawCircleImageAroundMarker(ShipMarker marker)
         {
+            // Remove any existing circle markers before adding a new one
+            foreach (var overlayMarker in markersOverlay.Markers.ToList())
+            {
+                if (overlayMarker.Tag != null && overlayMarker.Tag.ToString() == "Circle")
+                {
+                    markersOverlay.Markers.Remove(overlayMarker);
+                }
+            }
 
-            // Add the MouseDown event handler
-      
+            // Load the circle image from resources or file
+            Bitmap circleImage = new Bitmap(Resources.selection); // Replace with your actual image resource or path
 
+            // Create a new marker using the circle image
+            GMapMarker circleMarker = new GMapMarkerImage(marker.Position, circleImage)
+            {
+                Tag = "Circle"
+            };
+
+            // Add the circle marker to the overlay
+            markersOverlay.Markers.Add(circleMarker);
         }
+
+        private double CalculateBearing(PointLatLng start, PointLatLng end)
+        {
+            double lat1 = start.Lat * Math.PI / 180.0;
+            double lat2 = end.Lat * Math.PI / 180.0;
+            double dLon = (end.Lng - start.Lng) * Math.PI / 180.0;
+
+            double y = Math.Sin(dLon) * Math.Cos(lat2);
+            double x = Math.Cos(lat1) * Math.Sin(lat2) - Math.Sin(lat1) * Math.Cos(lat2) * Math.Cos(dLon);
+            double bearing = Math.Atan2(y, x) * 180.0 / Math.PI;
+
+            // Normalize to 0-360 degrees
+            return (bearing + 360.0) % 360.0;
+        }
+
+
+
+
+
     }
 }
