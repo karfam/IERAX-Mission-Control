@@ -19,6 +19,8 @@ using Newtonsoft.Json.Linq;
 using IERAX_MissionControl;
 using static GMap.NET.Entity.OpenStreetMapGraphHopperRouteEntity;
 using IERAX_MissionControl.Properties;
+using System.Net.Sockets;
+using System.Data.Entity.Core.Metadata.Edm;
 
 
 namespace IERAX_MissionControl
@@ -42,18 +44,23 @@ namespace IERAX_MissionControl
         private Dictionary<string, GMapMarker> shipMarkers = new Dictionary<string, GMapMarker>();
         private Panel infoPanel;
         private Label infoLabel;
+        private bool isTcpConnection = false; // Set this based on the connection type
+        private NetworkStream tcpStream; // Store the TCP stream for the connection
 
         private Dictionary<string, AisData> cachedAisData = new Dictionary<string, AisData>();
 
         private CancellationTokenSource cts;
 
+        private MavlinkMessageHandler mavlinkMessageHandler;
+
         public MPIeraxMain()
         {
+            InitializeMavlinkHandler();
             InitializeComponent();
             InitializeMap();
             InitializeInfoPanel();
             InitializeWebSocket();
-           
+
             // Attach resize event
             this.Resize += Form1_Resize;
 
@@ -62,8 +69,17 @@ namespace IERAX_MissionControl
 
         private void gMapControl1_Load(object sender, EventArgs e)
         {
-    
+
         }
+
+        // Initialize the MavlinkMessageHandler with delegates to update the drone marker and arm status box
+        private void InitializeMavlinkHandler()
+        {
+            // Initialize the MavlinkMessageHandler with delegates for updating the drone marker, arm status, and altimeter
+            mavlinkMessageHandler = new MavlinkMessageHandler(UpdateDroneMarker, UpdateArmStatusBox, UpdateAltimeterBox,UpdateDroneModeTextBox);
+        }
+
+
         private void InitializeMap()
         {
             ConfigureMap();
@@ -159,7 +175,7 @@ namespace IERAX_MissionControl
                         else
                         {
                             var message = Encoding.Default.GetString(buffer, 0, result.Count);
-                            Console.WriteLine($"Received {message}");
+                            // Console.WriteLine($"Received {message}");
                             var aisData = JsonConvert.DeserializeObject<AisData>(message);
                             if (aisData != null)
                             {
@@ -174,8 +190,6 @@ namespace IERAX_MissionControl
                 Console.WriteLine($"WebSocket error: {ex.Message}");
             }
         }
-
-
         private void ConfigureMap()
         {
             gMapControl1.MapProvider = GMapProviders.GoogleSatelliteMap;
@@ -186,7 +200,7 @@ namespace IERAX_MissionControl
             gMapControl1.Manager.Mode = AccessMode.ServerAndCache;
             gMapControl1.DragButton = MouseButtons.Left;
 
-     
+
             gMapControl1.MouseUp += new MouseEventHandler(gMapControl1_MouseUp);
 
 
@@ -205,29 +219,127 @@ namespace IERAX_MissionControl
 
         private void but_connect_Click(object sender, EventArgs e)
         {
-            // if the port is open close it
-            if (serialPort1.IsOpen)
+            string selectedConnection = CMB_comport.Text;
+
+            // Check if the selected option is an IP:Port format (indicating a TCP connection)
+            if (selectedConnection.Contains(":"))
             {
-                serialPort1.Close();
-                return;
+                // Parse the IP and port
+                string[] parts = selectedConnection.Split(':');
+                string ip = parts[0];
+                int port = int.Parse(parts[1]);
+
+                // Handle TCP connection
+                ConnectViaTCP(ip, port);
             }
+            else
+            {
+                // Handle serial port connection as before
 
-            // set the comport options
-            serialPort1.PortName = CMB_comport.Text;
-            serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+                // If the port is open, close it
+                if (serialPort1.IsOpen)
+                {
+                    serialPort1.Close();
+                    return;
+                }
 
-            // open the comport
-            serialPort1.Open();
+                // Set the comport options
+                serialPort1.PortName = selectedConnection;
+                serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
 
-            // set timeout to 2 seconds
-            serialPort1.ReadTimeout = 2000;
+                // Open the comport
+                serialPort1.Open();
 
-            BackgroundWorker bgw = new BackgroundWorker();
+                // Set timeout to 2 seconds
+                serialPort1.ReadTimeout = 2000;
 
-            bgw.DoWork += bgw_DoWork;
-
-            bgw.RunWorkerAsync();
+                // Start a background worker for handling the connection
+                BackgroundWorker bgw = new BackgroundWorker();
+                bgw.DoWork += bgw_DoWork;
+                bgw.RunWorkerAsync();
+            }
         }
+
+        private void ConnectViaTCP(string ip, int port)
+        {
+            try
+            {
+                TcpClient client = new TcpClient(ip, port);
+                tcpStream = client.GetStream();
+                isTcpConnection = true;
+
+                Task.Run(() => HandleMavlinkMessages(tcpStream));
+
+                Console.WriteLine($"Connected to drone at {ip}:{port}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to connect to {ip}:{port} - {ex.Message}");
+            }
+        }
+
+
+        private void HandleMavlinkMessages(NetworkStream stream)
+        {
+            MAVLink.MavlinkParse mavlink = new MAVLink.MavlinkParse();
+
+            while (true)
+            {
+                try
+                {
+                    MAVLink.MAVLinkMessage message = mavlink.ReadPacket(stream);
+
+                    if (message != null)
+                    {
+                       // Console.WriteLine($"Received MAVLink message: msgid={message.msgid}, sysid={message.sysid}, compid={message.compid}, msgtypename={message.msgtypename}");
+
+                        // Handle known messages
+                        mavlinkMessageHandler.HandleMavlinkMessage(message);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Received null message.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error receiving MAVLink message: {ex.Message}");
+                    break;
+                }
+            }
+        }
+
+
+
+
+        private void UpdateDroneMarker(PointLatLng position)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action<PointLatLng>(UpdateDroneMarker), position);
+            }
+            else
+            {
+                if (droneMarker == null)
+                {
+                    // Create the drone marker if it doesn't exist
+                    droneMarker = new DroneMarker(position);
+                    markersOverlay.Markers.Add(droneMarker);
+                }
+                else
+                {
+                    // Update the position of the existing drone marker
+                    droneMarker.Position = position;
+                }
+
+                // Optionally, refresh the overlay to ensure the marker is rendered correctly
+                markersOverlay.IsVisibile = false;
+                markersOverlay.IsVisibile = true;
+            }
+        }
+
+
+
 
 
         //EDO EXOUME TON ASYNC WORKER
@@ -242,7 +354,7 @@ namespace IERAX_MissionControl
                     {
                         // read any valid packet from the port
                         packet = mavlink.ReadPacket(serialPort1.BaseStream);
-                        
+
                         // check its valid
                         if (packet == null || packet.data == null)
                             continue;
@@ -286,8 +398,8 @@ namespace IERAX_MissionControl
                     if (sysid != packet.sysid || compid != packet.compid)
                         continue;
 
-                    //Console.WriteLine(packet.msgtypename);
-                    
+                    Console.WriteLine(packet.msgtypename);
+
                     if (packet.msgid == (byte)MAVLink.MAVLINK_MSG_ID.ATTITUDE)
                     //or
                     //if (packet.data.GetType() == typeof(MAVLink.mavlink_attitude_t))
@@ -305,7 +417,7 @@ namespace IERAX_MissionControl
             }
         }
 
-        T readsomedata<T>(byte sysid,byte compid,int timeout = 2000)
+        T readsomedata<T>(byte sysid, byte compid, int timeout = 2000)
         {
             DateTime deadline = DateTime.Now.AddMilliseconds(timeout);
 
@@ -314,17 +426,15 @@ namespace IERAX_MissionControl
                 // read the current buffered bytes
                 while (DateTime.Now < deadline)
                 {
-                    var packet = mavlink.ReadPacket(serialPort1.BaseStream);
+                    var packet = mavlink.ReadPacket(tcpStream);
 
                     // check its not null, and its addressed to us
                     if (packet == null || sysid != packet.sysid || compid != packet.compid)
                         continue;
 
-                  //  Console.WriteLine(packet);
-
-                    if (packet.data.GetType() == typeof (T))
+                    if (packet.data.GetType() == typeof(T))
                     {
-                        return (T) packet.data;
+                        return (T)packet.data;
                     }
                 }
             }
@@ -332,46 +442,79 @@ namespace IERAX_MissionControl
             throw new Exception("No packet match found");
         }
 
+
+        private void HandleUnexpectedPacket(MAVLink.MAVLinkMessage packet)
+        {
+            // Log or process unexpected packets
+            Console.WriteLine($"Handling unexpected packet with msgid={packet.msgid}, msgtypename={packet.msgtypename}");
+            // Depending on your needs, you could add more specific handling here
+        }
+
+
+
+
         private void but_armdisarm_Click(object sender, EventArgs e)
         {
             MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
 
-            req.target_system = 1;
-            req.target_component = 1;
+            // Set the correct target system and component IDs
+            req.target_system = 1; // Assuming sysid=1 is the correct ID
+            req.target_component = 1; // Assuming compid=1 is the correct ID
 
+            // ARM or DISARM command
             req.command = (ushort)MAVLink.MAV_CMD.COMPONENT_ARM_DISARM;
-
-            req.param1 = armed ? 0 : 1;
+            req.param1 = armed ? 0 : 1; // 0 to disarm, 1 to arm
             armed = !armed;
-            /*
-            req.param2 = p2;
-            req.param3 = p3;
-            req.param4 = p4;
-            req.param5 = p5;
-            req.param6 = p6;
-            req.param7 = p7;
-            */
 
             byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+            // Send the packet using the appropriate connection type
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100);
+  
+        }
 
-            serialPort1.Write(packet, 0, packet.Length);
-
-            try
+        private void UpdateArmStatusBox(bool isArmed)
+        {
+            if (ArmStatusBox.InvokeRequired)
             {
-                var ack = readsomedata<MAVLink.mavlink_command_ack_t>(sysid, compid);
-                if (ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED) 
+                ArmStatusBox.Invoke(new Action(() =>
                 {
-
-                }
+                    ArmStatusBox.Text = isArmed ? "Armed" : "Disarmed";
+                    ArmStatusBox.BackColor = isArmed ? Color.Red : Color.Green;
+                }));
             }
-            catch 
-            { 
+            else
+            {
+                ArmStatusBox.Text = isArmed ? "Armed" : "Disarmed";
+                ArmStatusBox.BackColor = isArmed ? Color.Red : Color.Green;
             }
         }
 
+
+
+
+
         private void CMB_comport_Click(object sender, EventArgs e)
         {
-            CMB_comport.DataSource = SerialPort.GetPortNames();
+            PopulateConnectionList();
+        }
+
+        private void PopulateConnectionList()
+        {
+            // Get available serial ports
+            var serialPorts = SerialPort.GetPortNames().ToList();
+
+            // Add the TCP connection option
+            serialPorts.Add("192.168.3.224:5760");
+
+            // Set the DataSource of the ComboBox to the updated list
+            CMB_comport.DataSource = serialPorts;
+
+            // Set default selection if needed
+            if (CMB_comport.Items.Count > 0)
+            {
+                CMB_comport.SelectedIndex = 0;
+            }
         }
 
         private void but_mission_Click(object sender, EventArgs e)
@@ -403,10 +546,10 @@ namespace IERAX_MissionControl
 
                 req2.frame = (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT;
 
-                req2.y = (int) (115 * 1.0e7);
-                req2.x = (int) (-35 * 1.0e7);
+                req2.y = (int)(115 * 1.0e7);
+                req2.x = (int)(-35 * 1.0e7);
 
-                req2.z = (float) (2.34);
+                req2.z = (float)(2.34);
 
                 req2.param1 = 0;
                 req2.param2 = 0;
@@ -422,7 +565,7 @@ namespace IERAX_MissionControl
                     serialPort1.Write(packet, 0, packet.Length);
 
                     var ack2 = readsomedata<MAVLink.mavlink_mission_ack_t>(sysid, compid);
-                    if ((MAVLink.MAV_MISSION_RESULT) ack2.type != MAVLink.MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
+                    if ((MAVLink.MAV_MISSION_RESULT)ack2.type != MAVLink.MAV_MISSION_RESULT.MAV_MISSION_ACCEPTED)
                     {
 
                     }
@@ -440,7 +583,7 @@ namespace IERAX_MissionControl
             }
         }
 
-     
+
         private void UpdateMapPosition(MAVLink.mavlink_global_position_int_t position)
         {
             Invoke(new Action(() =>
@@ -454,7 +597,7 @@ namespace IERAX_MissionControl
                 {
                     gMapControl1.Position = point;
                     isMapCentered = true;
-                    
+
                     Console.WriteLine("Initializing Web Socket");
                     Console.WriteLine($"Map centered at lat: {lat}, lng: {lng}");
                 }
@@ -470,14 +613,14 @@ namespace IERAX_MissionControl
             }));
         }
 
-  
+
 
         private void gMapControl1_MouseUp(object sender, MouseEventArgs e)
 
         {
             if (e.Button == MouseButtons.Left)
             {
-                Console.WriteLine("Pressed Left Click");
+                //Console.WriteLine("Pressed Left Click");
 
                 // Convert the mouse click position to the map's coordinate system
                 var clickLocation = gMapControl1.FromLocalToLatLng(e.X, e.Y);
@@ -498,7 +641,7 @@ namespace IERAX_MissionControl
                     // Check if the click was within the marker's area
                     if (markerRect.Contains(e.Location))
                     {
-                        Console.WriteLine("Pressed Left Click on marker");
+                        //Console.WriteLine("Pressed Left Click on marker");
                         if (marker is ShipMarker shipMarker)
                         {
                             ShowShipInfo(shipMarker);
@@ -522,13 +665,58 @@ namespace IERAX_MissionControl
         {
             ContextMenuStrip contextMenu = new ContextMenuStrip();
 
-            // Add items to the context menu
+            // Add a menu item for showing the coordinates
             contextMenu.Items.Add($"Latitude: {point.Lat:F6}, Longitude: {point.Lng:F6}", null);
-            // Add other menu items and handle their Click events as needed
+
+            // Add "Fly to this location" item
+            ToolStripMenuItem flyToMenuItem = new ToolStripMenuItem("Fly to this location");
+            flyToMenuItem.Click += (sender, e) => FlyToLocation(point);
+            contextMenu.Items.Add(flyToMenuItem);
+
+            // Add "Land at this location" item
+            ToolStripMenuItem landAtMenuItem = new ToolStripMenuItem("Land at this location");
+            landAtMenuItem.Click += (sender, e) => LandAtLocation(point);
+            contextMenu.Items.Add(landAtMenuItem);
 
             // Show the context menu at the mouse position
             contextMenu.Show(gMapControl1, location);
         }
+
+        private void FlyToLocation(PointLatLng point)
+        {
+            // Ensure the drone is in Guided mode
+            SwitchToGuidedMode();
+
+            // Convert latitude and longitude from double to int format required by FlyToWaypoint
+            int lat_int = (int)(point.Lat * 1e7);
+            int lon_int = (int)(point.Lng * 1e7);
+            int alt_int = 50; // Set your desired altitude here (in centimeters)
+
+            // Call the method to send the drone to the specified waypoint
+            FlyToWaypoint(lat_int, lon_int, alt_int);
+        }
+
+
+
+
+        private void LandAtLocation(PointLatLng point)
+        {
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+
+            req.target_system = 1; // Set to your drone's system ID
+            req.target_component = 1; // Set to your drone's component ID
+
+            req.command = (ushort)MAVLink.MAV_CMD.LAND; // Command to land at a specific location
+            req.param5 = (float)point.Lat; // Latitude
+            req.param6 = (float)point.Lng; // Longitude
+            req.param7 = 0.0f; // Final landing altitude (typically set to 0)
+
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100); // Add a small delay if necessary
+        }
+
+
 
 
 
@@ -557,14 +745,14 @@ namespace IERAX_MissionControl
                         heading = report.Cog;
                         speed = report.Sog;
 
-                        Console.WriteLine($"Parsed COG for ship {mmsi}: {heading} degrees.");
-                        Console.WriteLine($"Parsed SOG for ship {mmsi}: {speed} knots.");
+                        //Console.WriteLine($"Parsed COG for ship {mmsi}: {heading} degrees.");
+                        // Console.WriteLine($"Parsed SOG for ship {mmsi}: {speed} knots.");
 
                         // Handle TrueHeading if it's not 511 (unavailable)
                         if (report.TrueHeading != 511)
                         {
                             heading = report.TrueHeading;
-                            Console.WriteLine($"Parsed TrueHeading for ship {mmsi}: {heading} degrees.");
+                            // Console.WriteLine($"Parsed TrueHeading for ship {mmsi}: {heading} degrees.");
                         }
                     }
                     // Check for PositionReport (or any other relevant message type)
@@ -576,20 +764,20 @@ namespace IERAX_MissionControl
                         heading = report.Cog;
                         speed = report.Sog;
 
-                        Console.WriteLine($"Parsed COG for ship {mmsi}: {heading} degrees.");
-                        Console.WriteLine($"Parsed SOG for ship {mmsi}: {speed} knots.");
+                        // Console.WriteLine($"Parsed COG for ship {mmsi}: {heading} degrees.");
+                        // Console.WriteLine($"Parsed SOG for ship {mmsi}: {speed} knots.");
 
                         // Handle TrueHeading if it's not 511 (unavailable)
                         if (report.TrueHeading != 511)
                         {
                             heading = report.TrueHeading;
-                            Console.WriteLine($"Parsed TrueHeading for ship {mmsi}: {heading} degrees.");
+                            //   Console.WriteLine($"Parsed TrueHeading for ship {mmsi}: {heading} degrees.");
                         }
                     }
                     else
                     {
                         // If no relevant position report is found, log a message
-                        Console.WriteLine($"No recognized position report found for ship {mmsi}.");
+                        //   Console.WriteLine($"No recognized position report found for ship {mmsi}.");
                         return; // Exit the method early since there's no position data to update
                     }
 
@@ -600,7 +788,7 @@ namespace IERAX_MissionControl
                         if (shipMarker != null && shipMarker.PreviousPosition.HasValue)
                         {
                             heading = CalculateBearing(shipMarker.PreviousPosition.Value, currentPosition);
-                            Console.WriteLine($"Calculating heading for {shipName} (MMSI: {mmsi}). Previous Position: Lat {shipMarker.PreviousPosition.Value.Lat}, Lng {shipMarker.PreviousPosition.Value.Lng}. Current Position: Lat {currentPosition.Lat}, Lng {currentPosition.Lng}. Calculated Heading: {heading} degrees");
+                            // Console.WriteLine($"Calculating heading for {shipName} (MMSI: {mmsi}). Previous Position: Lat {shipMarker.PreviousPosition.Value.Lat}, Lng {shipMarker.PreviousPosition.Value.Lng}. Current Position: Lat {currentPosition.Lat}, Lng {currentPosition.Lng}. Calculated Heading: {heading} degrees");
 
                             shipMarker.PreviousPosition = currentPosition;
                         }
@@ -627,7 +815,7 @@ namespace IERAX_MissionControl
                     cachedAisData[mmsi] = aisData;
 
                     PointLatLng point = new PointLatLng(latitude, longitude);
-                    Console.WriteLine($"Updating ship {mmsi} marker at: {latitude}, {longitude}");
+                    // Console.WriteLine($"Updating ship {mmsi} marker at: {latitude}, {longitude}");
 
                     if (shipMarkers.ContainsKey(mmsi))
                     {
@@ -677,12 +865,6 @@ namespace IERAX_MissionControl
         }
 
 
-
-
-
-
-
-
         private void ShowShipInfo(ShipMarker marker)
         {
             if (marker != null)
@@ -701,7 +883,6 @@ namespace IERAX_MissionControl
                 DrawCircleImageAroundMarker(marker);
             }
         }
-
 
         private void DrawCircleImageAroundMarker(ShipMarker marker)
         {
@@ -741,9 +922,166 @@ namespace IERAX_MissionControl
             return (bearing + 360.0) % 360.0;
         }
 
+        private void CMB_comport_SelectedIndexChanged(object sender, EventArgs e)
+        {
 
+        }
+
+        private void cmb_baudrate_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            float targetAltitude = 50.0f; // Example altitude in meters
+            SendTakeoffCommand(targetAltitude);
+        }
+
+        private void UpdateAltimeterBox(double altitude)
+        {
+            if (AltimeterBox.InvokeRequired)
+            {
+                AltimeterBox.Invoke(new Action(() => AltimeterBox.Text = $"{altitude:F2} m"));
+            }
+            else
+            {
+                AltimeterBox.Text = $"{altitude:F2} m";
+            }
+        }
+
+        private void UpdateDroneModeTextBox(string flightMode)
+        {
+            if (this.DroneMode.InvokeRequired)
+            {
+                // If called from a different thread, use Invoke to switch to the UI thread
+                this.DroneMode.Invoke(new Action(() => UpdateDroneModeTextBox(flightMode)));
+            }
+            else
+            {
+                // Update the TextBox with the flight mode
+                this.DroneMode.Text = flightMode;
+            }
+        }
+
+
+        private void SendPacket(byte[] packet)
+        {
+            if (isTcpConnection && tcpStream != null)
+            {
+                tcpStream.Write(packet, 0, packet.Length);
+                tcpStream.Flush();
+                Console.WriteLine("Packet sent via TCP.");
+            }
+            else if (!isTcpConnection && serialPort1.IsOpen)
+            {
+                serialPort1.Write(packet, 0, packet.Length);
+                Console.WriteLine("Packet sent via Serial.");
+            }
+            else
+            {
+                Console.WriteLine("No valid connection available. Cannot send packet.");
+            }
+        }
+
+
+
+        private void SendTakeoffCommand(float targetAltitude)
+        {
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+
+            req.target_system = 1; // Set to your drone's system ID
+            req.target_component = 1; // Set to your drone's component ID
+
+            req.command = 22; // Numeric value for MAV_CMD_NAV_TAKEOFF
+            req.param1 = 0; // Minimum pitch (degrees), ignored by most flight stacks
+            req.param2 = 0; // Empty
+            req.param3 = 0; // Empty
+            req.param4 = float.NaN; // Yaw angle (optional), NaN for default heading
+            req.param5 = float.NaN; // Latitude (optional), NaN to stay at current position
+            req.param6 = float.NaN; // Longitude (optional), NaN to stay at current position
+            req.param7 = targetAltitude; // Target altitude in meters above ground
+
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+
+            // Send the packet using the appropriate connection type
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100);
+
+        }
+
+        private void AltHoldButton_Click(object sender, EventArgs e)
+        {
+            // Define the MAVLink command for changing the flight mode
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+
+            req.target_system = 1; // Set to your drone's system ID
+            req.target_component = 1; // Set to your drone's component ID
+
+            req.command = (ushort)MAVLink.MAV_CMD.DO_SET_MODE; // Command to set flight mode
+            req.param1 = 1; // Base mode (1: Auto mode)
+            req.param2 = 2; // Custom mode: AltHold (this value might differ depending on the autopilot firmware)
+
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100);
+        }
+
+        private void GuidedModeButton_Click(object sender, EventArgs e)
+        {
+            SwitchToGuidedMode();
+        }
+
+
+        private void SwitchToGuidedMode()
+        {
+            // Define the MAVLink command for changing the flight mode
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+
+            req.target_system = 1; // Set to your drone's system ID
+            req.target_component = 1; // Set to your drone's component ID
+
+            req.command = (ushort)MAVLink.MAV_CMD.DO_SET_MODE; // Command to set flight mode
+            req.param1 = 1; // Base mode (1: Auto mode)
+            req.param2 = 4; // Custom mode: Guided (this value might differ depending on the autopilot firmware)
+
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100);
+        }
+
+        private void FlyToWaypoint(int lat_int, int lon_int, int alt_int)
+        {
+            // Create the MAVLink message
+            MAVLink.mavlink_mission_item_int_t missionItem = new MAVLink.mavlink_mission_item_int_t();
+
+            missionItem.target_system = 1;  // Drone's system ID
+            missionItem.target_component = 1;  // Drone's component ID
+            missionItem.seq = 0;  // Waypoint sequence number (0 if it's the first/only waypoint)
+            missionItem.frame = (byte)MAVLink.MAV_FRAME.GLOBAL;  // Use global coordinates
+            missionItem.command = (ushort)MAVLink.MAV_CMD.WAYPOINT;  // Command to navigate to waypoint
+            missionItem.current = 2;  // Set to 2 to indicate a guided mode command
+            missionItem.autocontinue = 1;  // Autocontinue to the next waypoint (1 = yes, 0 = no)
+            missionItem.param1 = 0;  // Hold time at waypoint
+            missionItem.param2 = 0;  // Acceptance radius in meters
+            missionItem.param3 = 0;  // Pass through waypoint (0 = yes)
+            missionItem.param4 = float.NaN;  // Desired yaw angle, NaN for default
+            missionItem.x = lat_int;  // Latitude
+            missionItem.y = lon_int;  // Longitude
+            missionItem.z = alt_int;  // Altitude in meters above MSL
+            missionItem.mission_type = (byte)MAVLink.MAV_MISSION_TYPE.MISSION;  // Mission type (standard mission)
+
+            // Pack the message into a byte array
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.MISSION_ITEM_INT, missionItem);
+
+            // Send the packet using the appropriate connection type (TCP/Serial)
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100);  // Add a small delay if necessary
+        }
 
 
 
     }
+
 }
+

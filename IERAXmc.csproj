@@ -108,6 +108,7 @@
     <Compile Include="AisMessage.cs" />
     <Compile Include="GMapMarkerImage.cs" />
     <Compile Include="HistoryMarker.cs" />
+    <Compile Include="MavlinkMessageHandler.cs" />
     <Compile Include="ShipMarker.cs" />
     <Compile Include="GeoUtils.cs" />
     <Compile Include="DroneMarker.cs" />
@@ -131,6 +132,7 @@
     </Compile>
     <EmbeddedResource Include="main.resx">
       <DependentUpon>main.cs</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
