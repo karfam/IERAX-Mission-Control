@@ -64,12 +64,12 @@ namespace IERAX_MissionControl
             string flightMode = DecodeFlightMode(heartbeat);
 
             bool isArmed = (heartbeat.base_mode & (byte)MAVLink.MAV_MODE_FLAG.SAFETY_ARMED) != 0;
-
+            //Console.WriteLine(isArmed ? "Drone is armed." : "Drone is disarmed.");
             // Update the arm status box using the provided delegate
             updateArmStatusBoxAction(isArmed);
             UpdateDroneModeTextBox(flightMode);
 
-            // Console.WriteLine($"HEARTBEAT: type={heartbeat.type}, autopilot={heartbeat.autopilot}, base_mode={heartbeat.base_mode}, system_status={heartbeat.system_status}, mavlink_version={heartbeat.mavlink_version}");
+           //Console.WriteLine($"HEARTBEAT: type={heartbeat.type}, autopilot={heartbeat.autopilot}, base_mode={heartbeat.base_mode}, system_status={heartbeat.system_status}, mavlink_version={heartbeat.mavlink_version}");
             // Console.WriteLine(isArmed ? "Drone is armed." : "Drone is disarmed.");
         }
 

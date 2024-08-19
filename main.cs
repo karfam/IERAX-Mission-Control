@@ -21,6 +21,9 @@ using static GMap.NET.Entity.OpenStreetMapGraphHopperRouteEntity;
 using IERAX_MissionControl.Properties;
 using System.Net.Sockets;
 using System.Data.Entity.Core.Metadata.Edm;
+using System.Net;
+
+
 
 
 namespace IERAX_MissionControl
@@ -46,12 +49,18 @@ namespace IERAX_MissionControl
         private Label infoLabel;
         private bool isTcpConnection = false; // Set this based on the connection type
         private NetworkStream tcpStream; // Store the TCP stream for the connection
+        private UdpClient udpClient;
+        private IPEndPoint remoteEndPoint;
 
         private Dictionary<string, AisData> cachedAisData = new Dictionary<string, AisData>();
 
         private CancellationTokenSource cts;
 
         private MavlinkMessageHandler mavlinkMessageHandler;
+
+        private System.Windows.Forms.Timer flyToShipTimer;
+        private ShipMarker targetShipMarker;
+        
 
         public MPIeraxMain()
         {
@@ -291,10 +300,18 @@ namespace IERAX_MissionControl
 
                     if (message != null)
                     {
-                       // Console.WriteLine($"Received MAVLink message: msgid={message.msgid}, sysid={message.sysid}, compid={message.compid}, msgtypename={message.msgtypename}");
+                        // Check if the message's sysid is 1
+                        if (message.sysid == 1)
+                        {
+                           //Console.WriteLine($"Received MAVLink message: msgid={message.msgid}, sysid={message.sysid}, compid={message.compid}, msgtypename={message.msgtypename}");
 
-                        // Handle known messages
-                        mavlinkMessageHandler.HandleMavlinkMessage(message);
+                            // Handle known messages
+                            mavlinkMessageHandler.HandleMavlinkMessage(message);
+                        }
+                        else
+                        {
+                           // Console.WriteLine($"Ignored message from sysid={message.sysid}, expected sysid=1");
+                        }
                     }
                     else
                     {
@@ -308,6 +325,7 @@ namespace IERAX_MissionControl
                 }
             }
         }
+
 
 
 
@@ -476,7 +494,8 @@ namespace IERAX_MissionControl
         private void UpdateArmStatusBox(bool isArmed)
         {
             if (ArmStatusBox.InvokeRequired)
-            {
+            {   
+
                 ArmStatusBox.Invoke(new Action(() =>
                 {
                     ArmStatusBox.Text = isArmed ? "Armed" : "Disarmed";
@@ -506,6 +525,8 @@ namespace IERAX_MissionControl
 
             // Add the TCP connection option
             serialPorts.Add("192.168.3.224:5760");
+            serialPorts.Add("127.0.0.1:5760");
+            serialPorts.Add("127.0.0.1:5762");
 
             // Set the DataSource of the ComboBox to the updated list
             CMB_comport.DataSource = serialPorts;
@@ -616,71 +637,102 @@ namespace IERAX_MissionControl
 
 
         private void gMapControl1_MouseUp(object sender, MouseEventArgs e)
-
         {
+            ShipMarker clickedShipMarker = null;
+
+            // Convert the mouse click position to the map's coordinate system
+            var clickLocation = gMapControl1.FromLocalToLatLng(e.X, e.Y);
+
+            foreach (var marker in markersOverlay.Markers)
+            {
+                // Calculate the size of the marker on the map
+                var markerSize = new Size(50, 50); // Assuming the marker's size is 50x50
+                var markerScreenPosition = gMapControl1.FromLatLngToLocal(marker.Position);
+
+                Rectangle markerRect = new Rectangle(
+                    (int)(markerScreenPosition.X - markerSize.Width / 2),
+                    (int)(markerScreenPosition.Y - markerSize.Height / 2),
+                    markerSize.Width,
+                    markerSize.Height
+                );
+
+                // Check if the click was within the marker's area
+                if (markerRect.Contains(e.Location))
+                {
+                    if (marker is ShipMarker shipMarker)
+                    {
+                        clickedShipMarker = shipMarker;
+                    }
+                    break; // Exit the loop after finding the clicked marker
+                }
+            }
+
             if (e.Button == MouseButtons.Left)
             {
-                //Console.WriteLine("Pressed Left Click");
-
-                // Convert the mouse click position to the map's coordinate system
-                var clickLocation = gMapControl1.FromLocalToLatLng(e.X, e.Y);
-
-                foreach (var marker in markersOverlay.Markers)
+                // Handle left click
+                if (clickedShipMarker != null)
                 {
-                    // Calculate the size of the marker on the map
-                    var markerSize = new Size(50, 50); // Assuming the marker's size is 50x50
-                    var markerScreenPosition = gMapControl1.FromLatLngToLocal(marker.Position);
-
-                    Rectangle markerRect = new Rectangle(
-                        (int)(markerScreenPosition.X - markerSize.Width / 2),
-                        (int)(markerScreenPosition.Y - markerSize.Height / 2),
-                        markerSize.Width,
-                        markerSize.Height
-                    );
-
-                    // Check if the click was within the marker's area
-                    if (markerRect.Contains(e.Location))
-                    {
-                        //Console.WriteLine("Pressed Left Click on marker");
-                        if (marker is ShipMarker shipMarker)
-                        {
-                            ShowShipInfo(shipMarker);
-                        }
-                        break; // Exit the loop after finding the clicked marker
-                    }
+                    ShowShipInfo(clickedShipMarker);
                 }
             }
 
             if (e.Button == MouseButtons.Right)
             {
-                // Get the latitude and longitude of the point clicked
-                PointLatLng point = gMapControl1.FromLocalToLatLng(e.X, e.Y);
+                // Handle right click
+                if (clickedShipMarker != null)
+                {
+                    // Show context menu with "Fly to [ShipName]" option
+                    ShowRightClickMenu(clickedShipMarker.Position, e.Location, clickedShipMarker);
 
-                // Optionally, you can show a context menu or perform some other action
-                ShowRightClickMenu(point, e.Location);
+                    // Show ship info as well
+                    ShowShipInfo(clickedShipMarker);
+                }
+                else
+                {
+                    // Get the latitude and longitude of the point clicked
+                    PointLatLng point = gMapControl1.FromLocalToLatLng(e.X, e.Y);
+
+                    // Show the default right-click menu
+                    ShowRightClickMenu(point, e.Location);
+                }
             }
         }
 
-        private void ShowRightClickMenu(PointLatLng point, Point location)
+
+        private void ShowRightClickMenu(PointLatLng point, Point location, ShipMarker clickedMarker = null)
         {
             ContextMenuStrip contextMenu = new ContextMenuStrip();
 
-            // Add a menu item for showing the coordinates
-            contextMenu.Items.Add($"Latitude: {point.Lat:F6}, Longitude: {point.Lng:F6}", null);
+            if (clickedMarker != null)
+            {
+                // If the right-click was on a ship marker, add the "Fly to [ShipName]" option
+                contextMenu.Items.Add($"Fly to {clickedMarker.ShipName}", null, (s, e) => FlyToShip(clickedMarker));
 
-            // Add "Fly to this location" item
-            ToolStripMenuItem flyToMenuItem = new ToolStripMenuItem("Fly to this location");
-            flyToMenuItem.Click += (sender, e) => FlyToLocation(point);
-            contextMenu.Items.Add(flyToMenuItem);
+                // Optionally, you can still show the coordinates of the ship
+                contextMenu.Items.Add($"Latitude: {clickedMarker.Position.Lat:F6}, Longitude: {clickedMarker.Position.Lng:F6}", null);
+            }
+            else
+            {
+                // Add a menu item for showing the coordinates
+                contextMenu.Items.Add($"Latitude: {point.Lat:F6}, Longitude: {point.Lng:F6}", null);
 
-            // Add "Land at this location" item
-            ToolStripMenuItem landAtMenuItem = new ToolStripMenuItem("Land at this location");
-            landAtMenuItem.Click += (sender, e) => LandAtLocation(point);
-            contextMenu.Items.Add(landAtMenuItem);
+                // Add "Fly to this location" item
+                ToolStripMenuItem flyToMenuItem = new ToolStripMenuItem("Fly to this location");
+                flyToMenuItem.Click += (sender, e) => FlyToLocation(point);
+                contextMenu.Items.Add(flyToMenuItem);
+
+                // Add "Land at this location" item
+                ToolStripMenuItem landAtMenuItem = new ToolStripMenuItem("Land at this location");
+                landAtMenuItem.Click += (sender, e) => LandAtLocation(point);
+                contextMenu.Items.Add(landAtMenuItem);
+            }
 
             // Show the context menu at the mouse position
             contextMenu.Show(gMapControl1, location);
         }
+
+
+
 
         private void FlyToLocation(PointLatLng point)
         {
@@ -1079,8 +1131,55 @@ namespace IERAX_MissionControl
             System.Threading.Thread.Sleep(100);  // Add a small delay if necessary
         }
 
+        private void FlyToShip(ShipMarker shipMarker)
+        {
+            // Store the target ship marker
+            targetShipMarker = shipMarker;
 
+            // Start a timer to continuously update the drone's target position
+            if (flyToShipTimer == null)
+            {
+                flyToShipTimer = new System.Windows.Forms.Timer();
+                flyToShipTimer.Interval = 1000; // Update every second
+                flyToShipTimer.Tick += FlyToShipTimer_Tick;
+            }
 
+            flyToShipTimer.Start();
+        }
+
+        private void FlyToShipTimer_Tick(object sender, EventArgs e)
+        {
+            if (targetShipMarker != null)
+            {
+                // Get the latest position of the ship
+                PointLatLng latestPosition = targetShipMarker.Position;
+
+                // Command the drone to fly to the ship's latest position
+                FlyToLocation(latestPosition);
+                ShipFollowingModeLabel.Text = $"Following {targetShipMarker.ShipName}";
+                ShipFollowingModeLabel.BackColor = Color.Red; // Set the label background to red
+
+                Console.WriteLine($"Flying to {targetShipMarker.ShipName} at updated position: Lat {latestPosition.Lat}, Lng {latestPosition.Lng}");
+            }
+        }
+
+        private void StopFlyToShip()
+        {
+            if (flyToShipTimer != null)
+            {
+                flyToShipTimer.Stop();
+            }
+            // Update the label to indicate that ship following is disabled
+            ShipFollowingModeLabel.Text = "SHIP FOLLOWING DISABLED";
+        
+            ShipFollowingModeLabel.BackColor = Color.Green; // Set the label background to green
+            targetShipMarker = null;
+        }
+
+        private void StopFollowingShipButton_Click(object sender, EventArgs e)
+        {
+            StopFlyToShip();
+        }
     }
 
 }
