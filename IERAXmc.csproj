@@ -108,6 +108,7 @@
     <Compile Include="AisMessage.cs" />
     <Compile Include="GMapMarkerImage.cs" />
     <Compile Include="HistoryMarker.cs" />
+    <Compile Include="InterceptMarker.cs" />
     <Compile Include="MavlinkMessageHandler.cs" />
     <Compile Include="ShipMarker.cs" />
     <Compile Include="GeoUtils.cs" />
@@ -158,6 +159,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\Images\container.png" />
+    <Content Include="Resources\Images\triangle-outline-256.png" />
     <EmbeddedResource Include="Resources\Images\ieraxlogo.png" />
     <EmbeddedResource Include="Resources\Images\selection.png" />
   </ItemGroup>

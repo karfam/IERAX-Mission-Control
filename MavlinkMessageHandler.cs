@@ -13,6 +13,8 @@ namespace IERAX_MissionControl
         private readonly Action<bool> updateArmStatusBoxAction;
         private readonly Action<double> updateAltimeterBoxAction;
         private readonly Action<string> UpdateDroneModeTextBox;
+        public PointLatLng DroneCurrentPosition { get; set; }
+
 
         public MavlinkMessageHandler(Action<PointLatLng> updateDroneMarkerAction, Action<bool> updateArmStatusBoxAction, Action<double> updateAltimeterBoxAction, Action<string> updateDroneModeTextBox)
         {
@@ -82,6 +84,8 @@ namespace IERAX_MissionControl
             double altitude = positionMessage.relative_alt / 1000.0; // in meters
 
             PointLatLng position = new PointLatLng(latitude, longitude);
+            // Update the global variable
+            DroneCurrentPosition = position;
 
             // Update the drone marker using the provided delegate
             updateDroneMarkerAction(position);
@@ -91,6 +95,8 @@ namespace IERAX_MissionControl
 
             //Console.WriteLine($"GLOBAL_POSITION_INT: Lat={latitude}, Lng={longitude}, Alt={altitude}");
         }
+
+    
 
         private string DecodeFlightMode(MAVLink.mavlink_heartbeat_t heartbeat)
         {

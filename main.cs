@@ -26,6 +26,8 @@ using System.Net;
 
 
 
+
+
 namespace IERAX_MissionControl
 {
     public partial class MPIeraxMain : Form
@@ -708,6 +710,9 @@ namespace IERAX_MissionControl
                 // If the right-click was on a ship marker, add the "Fly to [ShipName]" option
                 contextMenu.Items.Add($"Fly to {clickedMarker.ShipName}", null, (s, e) => FlyToShip(clickedMarker));
 
+                // Add "Intercept [ShipName]" option
+                contextMenu.Items.Add($"Intercept {clickedMarker.ShipName}", null, (s, e) => InterceptShip(clickedMarker));
+
                 // Optionally, you can still show the coordinates of the ship
                 contextMenu.Items.Add($"Latitude: {clickedMarker.Position.Lat:F6}, Longitude: {clickedMarker.Position.Lng:F6}", null);
             }
@@ -1175,6 +1180,144 @@ namespace IERAX_MissionControl
             ShipFollowingModeLabel.BackColor = Color.Green; // Set the label background to green
             targetShipMarker = null;
         }
+
+        private void InterceptShip(ShipMarker shipMarker)
+        {
+            // Store the target ship marker
+            targetShipMarker = shipMarker;
+
+            // Start a timer to continuously update the drone's intercept position
+            if (flyToShipTimer == null)
+            {
+                flyToShipTimer = new System.Windows.Forms.Timer();
+                flyToShipTimer.Interval = 1000; // Update every second
+                flyToShipTimer.Tick += InterceptShipTimer_Tick;
+            }
+
+            flyToShipTimer.Start();
+
+            // Update the label to indicate that intercepting is enabled
+            ShipFollowingModeLabel.Text = $"Intercepting {shipMarker.ShipName}";
+            ShipFollowingModeLabel.BackColor = Color.Red;
+
+            // Calculate the initial intercept position
+            double droneSpeedKmh = 40.0;
+            double droneSpeedMps = droneSpeedKmh / 3.6;
+            double shipSpeedMps = shipMarker.Speed * 0.514444;
+
+            var dronePosition = GetDroneCurrentPosition();
+            double distanceToShip = GetDistance(dronePosition, shipMarker.Position);
+            double timeToIntercept = distanceToShip / droneSpeedMps;
+
+            PointLatLng interceptPosition = CalculateInterceptPosition(shipMarker.Position, shipMarker.Heading, shipSpeedMps, timeToIntercept);
+
+            // Add the intercept marker
+            AddInterceptMarker(interceptPosition);
+        }
+
+        private void AddInterceptMarker(PointLatLng interceptPosition)
+        {
+            // Remove the previous intercept marker if it exists
+            var existingInterceptMarkers = markersOverlay.Markers
+                .Where(m => m is InterceptMarker)
+                .ToList(); // ToList() is important to avoid modifying the collection while iterating
+
+            foreach (var marker in existingInterceptMarkers)
+            {
+                markersOverlay.Markers.Remove(marker);
+            }
+
+            // Add the new intercept marker
+            InterceptMarker interceptMarker = new InterceptMarker(interceptPosition);
+            markersOverlay.Markers.Add(interceptMarker);
+
+            // Refresh the overlay
+            gMapControl1.Refresh();
+        }
+
+
+
+
+
+        private void InterceptShipTimer_Tick(object sender, EventArgs e)
+        {
+            if (targetShipMarker != null && targetShipMarker.Speed > 0)
+            {
+                double droneSpeedKmh = 40.0;
+                double droneSpeedMps = droneSpeedKmh / 3.6;
+                double shipSpeedMps = targetShipMarker.Speed * 0.514444;
+
+                var dronePosition = GetDroneCurrentPosition();
+                double distanceToShip = GetDistance(dronePosition, targetShipMarker.Position);
+                double timeToIntercept = distanceToShip / droneSpeedMps;
+
+                PointLatLng interceptPosition = CalculateInterceptPosition(targetShipMarker.Position, targetShipMarker.Heading, shipSpeedMps, timeToIntercept);
+
+                // Update the intercept marker position
+                AddInterceptMarker(interceptPosition);
+
+                // Command the drone to fly to the intercept position
+                FlyToLocation(interceptPosition);
+
+                Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
+            }
+            else
+            {
+                // Stop following if the ship stops or the speed is zero
+                StopFlyToShip();
+            }
+        }
+
+
+
+
+        private PointLatLng CalculateInterceptPosition(PointLatLng shipPosition, double shipHeading, double shipSpeedMps, double timeInSeconds)
+        {
+            // Calculate the distance the ship will travel in the given time
+            double distance = shipSpeedMps * timeInSeconds;
+
+            // Convert heading to radians
+            double headingRad = shipHeading * (Math.PI / 180);
+
+            // Calculate the ship's future position
+            double deltaLat = (distance / 6371000.0) * Math.Cos(headingRad); // Earth's radius in meters
+            double deltaLng = (distance / 6371000.0) * Math.Sin(headingRad) / Math.Cos(shipPosition.Lat * (Math.PI / 180));
+
+            double futureLat = shipPosition.Lat + (deltaLat * (180 / Math.PI));
+            double futureLng = shipPosition.Lng + (deltaLng * (180 / Math.PI));
+
+            return new PointLatLng(futureLat, futureLng);
+        }
+
+        private PointLatLng GetDroneCurrentPosition()
+        {
+            PointLatLng currentPosition = mavlinkMessageHandler.DroneCurrentPosition;
+            return currentPosition;
+        }
+
+
+
+        private double GetDistance(PointLatLng point1, PointLatLng point2)
+        {
+            double R = 6371000; // Earth's radius in meters
+            double lat1 = point1.Lat * (Math.PI / 180);
+            double lat2 = point2.Lat * (Math.PI / 180);
+            double deltaLat = (point2.Lat - point1.Lat) * (Math.PI / 180);
+            double deltaLng = (point2.Lng - point1.Lng) * (Math.PI / 180);
+
+            double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
+                       Math.Cos(lat1) * Math.Cos(lat2) *
+                       Math.Sin(deltaLng / 2) * Math.Sin(deltaLng / 2);
+
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+            return R * c; // Distance in meters
+        }
+
+
+
+
+
 
         private void StopFollowingShipButton_Click(object sender, EventArgs e)
         {
