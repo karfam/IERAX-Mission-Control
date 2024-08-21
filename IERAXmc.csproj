@@ -159,6 +159,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\Images\container.png" />
+    <Content Include="Resources\Images\Drone Take OFF.png" />
     <Content Include="Resources\Images\triangle-outline-256.png" />
     <EmbeddedResource Include="Resources\Images\ieraxlogo.png" />
     <EmbeddedResource Include="Resources\Images\selection.png" />

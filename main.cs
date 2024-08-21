@@ -47,8 +47,7 @@ namespace IERAX_MissionControl
         private bool isMapCentered = false; // Flag to track if the map has been centered
         private ClientWebSocket ws;
         private Dictionary<string, GMapMarker> shipMarkers = new Dictionary<string, GMapMarker>();
-        private Panel infoPanel;
-        private Label infoLabel;
+       // private Label infoLabel;
         private bool isTcpConnection = false; // Set this based on the connection type
         private NetworkStream tcpStream; // Store the TCP stream for the connection
         private UdpClient udpClient;
@@ -69,11 +68,11 @@ namespace IERAX_MissionControl
             InitializeMavlinkHandler();
             InitializeComponent();
             InitializeMap();
-            InitializeInfoPanel();
+            //InitializeInfoPanel();
             InitializeWebSocket();
 
             // Attach resize event
-            this.Resize += Form1_Resize;
+            //this.Resize += Form1_Resize;
 
         }
 
@@ -108,12 +107,12 @@ namespace IERAX_MissionControl
 
         }
 
-        private void Form1_Resize(object sender, EventArgs e)
+     /*   private void Form1_Resize(object sender, EventArgs e)
         {
             PositionInfoPanel();
-        }
+        }*/
 
-        private void InitializeInfoPanel()
+ /*       private void InitializeInfoPanel()
         {
             // Initialize the panel
             infoPanel = new Panel
@@ -139,14 +138,14 @@ namespace IERAX_MissionControl
 
             // Position the panel in the top-right corner of the map
             PositionInfoPanel();
-        }
+        }*/
 
-        private void PositionInfoPanel()
+   /*     private void PositionInfoPanel()
         {
             // Position the panel in the top-right corner of the gMapControl
             infoPanel.Location = new Point(gMapControl1.Width - infoPanel.Width - 10, 50);
             infoPanel.BringToFront();
-        }
+        }*/
 
         private async void InitializeWebSocket()
         {
@@ -211,6 +210,8 @@ namespace IERAX_MissionControl
             gMapControl1.Manager.Mode = AccessMode.ServerAndCache;
             gMapControl1.DragButton = MouseButtons.Left;
 
+            // Set the GMapControl to fill the parent form
+            gMapControl1.Dock = DockStyle.Fill;
 
             gMapControl1.MouseUp += new MouseEventHandler(gMapControl1_MouseUp);
 
@@ -933,8 +934,8 @@ namespace IERAX_MissionControl
                               $"Vessel Type: {marker.VesselType}";
 
                 // Display ship information in the info panel
-                infoLabel.Text = info;
-                infoPanel.Visible = true;
+                ShipInfoLabel.Text = info;
+                ShipInfoLabel.Visible = true;
 
                 // Draw a circle around the ship marker using an image
                 DrawCircleImageAroundMarker(marker);
@@ -1322,6 +1323,41 @@ namespace IERAX_MissionControl
         private void StopFollowingShipButton_Click(object sender, EventArgs e)
         {
             StopFlyToShip();
+        }
+
+        private void ArmStatusBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void tableLayoutPanel2_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void MPIeraxMain_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void pictureBox1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void tableLayoutPanel1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void AltimeterBox_TextChanged(object sender, EventArgs e)
+        {
+
         }
     }
 
