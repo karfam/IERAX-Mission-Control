@@ -52,6 +52,7 @@ namespace IERAX_MissionControl
         private NetworkStream tcpStream; // Store the TCP stream for the connection
         private UdpClient udpClient;
         private IPEndPoint remoteEndPoint;
+       
 
         private Dictionary<string, AisData> cachedAisData = new Dictionary<string, AisData>();
 
@@ -61,7 +62,8 @@ namespace IERAX_MissionControl
 
         private System.Windows.Forms.Timer flyToShipTimer;
         private ShipMarker targetShipMarker;
-        
+     
+
 
         public MPIeraxMain()
         {
@@ -86,7 +88,7 @@ namespace IERAX_MissionControl
         private void InitializeMavlinkHandler()
         {
             // Initialize the MavlinkMessageHandler with delegates for updating the drone marker, arm status, and altimeter
-            mavlinkMessageHandler = new MavlinkMessageHandler(UpdateDroneMarker, UpdateArmStatusBox, UpdateAltimeterBox,UpdateDroneModeTextBox);
+            mavlinkMessageHandler = new MavlinkMessageHandler(UpdateDroneMarker, UpdateArmStatusBox, UpdateAltimeterBox,UpdateDroneModeTextBox,UpdateTextLabelGUI);
         }
 
 
@@ -1021,6 +1023,40 @@ namespace IERAX_MissionControl
                 this.DroneMode.Text = flightMode;
             }
         }
+
+        public void UpdateTextLabelGUI (string labelName, string value)
+        {
+            // Find the label by name
+            Label label = FindLabelByName(labelName);
+
+            // Update the label with the provided value
+            UpdateTextLabelAction(label, value);
+        }
+
+        public void UpdateTextLabelAction(Control control, string value)
+        {
+            if (control.InvokeRequired)
+            {
+                // If called from a different thread, use Invoke to switch to the UI thread
+                control.Invoke(new Action(() => UpdateTextLabelAction(control, value)));
+            }
+            else
+            {
+                // Update the control with the provided value
+                control.Text = value;
+            }
+        }
+
+
+        private Label FindLabelByName(string labelName)
+        {
+            // Logic to find the label by name
+            // This is just a placeholder; replace with your actual logic
+            return this.Controls.Find(labelName, true).FirstOrDefault() as Label;
+        }
+
+
+
 
 
         private void SendPacket(byte[] packet)

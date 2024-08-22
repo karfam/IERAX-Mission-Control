@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace IERAX_MissionControl
 {
@@ -12,17 +13,26 @@ namespace IERAX_MissionControl
         private readonly Action<PointLatLng> updateDroneMarkerAction;
         private readonly Action<bool> updateArmStatusBoxAction;
         private readonly Action<double> updateAltimeterBoxAction;
-        private readonly Action<string> UpdateDroneModeTextBox;
+        private readonly Action<string> updateDroneModeTextBox;
+        private readonly Action<string, string> updateTextLabelGUI;
+
         public PointLatLng DroneCurrentPosition { get; set; }
+        public float DroneGroundSpeed { get; set; }
 
 
-        public MavlinkMessageHandler(Action<PointLatLng> updateDroneMarkerAction, Action<bool> updateArmStatusBoxAction, Action<double> updateAltimeterBoxAction, Action<string> updateDroneModeTextBox)
+        public MavlinkMessageHandler(Action<PointLatLng> updateDroneMarkerAction, Action<bool> updateArmStatusBoxAction,
+                                 Action<double> updateAltimeterBoxAction, Action<string> updateDroneModeTextBox,
+                                 Action<string, string> updateTextLabelGUI)
         {
             this.updateDroneMarkerAction = updateDroneMarkerAction;
             this.updateArmStatusBoxAction = updateArmStatusBoxAction;
             this.updateAltimeterBoxAction = updateAltimeterBoxAction;
-            this.UpdateDroneModeTextBox = updateDroneModeTextBox;
+            this.updateDroneModeTextBox = updateDroneModeTextBox;
+            this.updateTextLabelGUI = updateTextLabelGUI;
+
         }
+
+
 
         public void HandleMavlinkMessage(MAVLink.MAVLinkMessage message)
         {
@@ -39,12 +49,63 @@ namespace IERAX_MissionControl
                 case (byte)MAVLink.MAVLINK_MSG_ID.COMMAND_ACK:
                     HandleCommandAckMessage(message);
                     break;
+                case (byte)MAVLink.MAVLINK_MSG_ID.NAV_CONTROLLER_OUTPUT:
+                    HandleNavControllerOutput(message);   
+                    break;
+                case (byte)MAVLink.MAVLINK_MSG_ID.VFR_HUD:
+                    HandleVFR_HUDOutput(message);
+                    break;
+                 
 
                 default:
                     //Console.WriteLine($"Unhandled MAVLink message: {message.msgtypename}");
                     break;
             }
         }
+
+
+        private void HandleNavControllerOutput(MAVLink.MAVLinkMessage message)
+        {
+            var navControllerOutput = (MAVLink.mavlink_nav_controller_output_t)message.data;
+            Console.WriteLine("inside handlenavcontrol");
+            // Distance to the waypoint (in meters)
+            double distanceToWP = navControllerOutput.wp_dist;
+
+            // Assuming you have a known drone speed (convert to meters per second)
+            double droneSpeedMps = 11.11; // 40 km/h
+
+            // Time to the waypoint (in seconds)
+            double timeToWP = distanceToWP / droneSpeedMps;
+            string distanceToWPString = distanceToWP.ToString("F2") + " meters";
+            updateTextLabelGUI("DistanceToWPLabel", distanceToWPString);
+            updateTextLabelGUI("TimeToWPLabel", timeToWP.ToString("F2"));
+    
+
+            // Optionally, print to the console for debugging
+            Console.WriteLine($"Distance to WP: {distanceToWP:F2} meters, Time to WP: {timeToWP:F2} seconds");
+        }
+
+        private void HandleVFR_HUDOutput(MAVLink.MAVLinkMessage message)
+        {
+            var vfrHud = (MAVLink.mavlink_vfr_hud_t)message.data;
+            
+            string Airspeed = vfrHud.airspeed.ToString("F2")+ "m/s";   // Airspeed in m/s
+            string Groundspeed = vfrHud.groundspeed.ToString("F2") + "m/s"; // Groundspeed in m/s
+            string Altitude = vfrHud.alt.ToString("F2");      // Altitude in meters
+            string ClimbRate = vfrHud.climb.ToString("F2");     // Climb rate in m/s
+            string Heading = vfrHud.heading.ToString();        // Heading in degrees
+            string Throttle = vfrHud.throttle.ToString();      // Throttle percentage
+                                                               // Update the global variable
+            DroneGroundSpeed = vfrHud.groundspeed;
+
+            updateTextLabelGUI("GSpeedLabel", Groundspeed);
+            updateTextLabelGUI("ASpeedLabel", Airspeed);
+          
+        }
+
+
+
+
 
         private void HandleCommandAckMessage(MAVLink.MAVLinkMessage message)
         {
@@ -69,7 +130,7 @@ namespace IERAX_MissionControl
             //Console.WriteLine(isArmed ? "Drone is armed." : "Drone is disarmed.");
             // Update the arm status box using the provided delegate
             updateArmStatusBoxAction(isArmed);
-            UpdateDroneModeTextBox(flightMode);
+            updateDroneModeTextBox(flightMode);
 
            //Console.WriteLine($"HEARTBEAT: type={heartbeat.type}, autopilot={heartbeat.autopilot}, base_mode={heartbeat.base_mode}, system_status={heartbeat.system_status}, mavlink_version={heartbeat.mavlink_version}");
             // Console.WriteLine(isArmed ? "Drone is armed." : "Drone is disarmed.");
