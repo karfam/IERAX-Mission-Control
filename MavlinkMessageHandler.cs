@@ -67,7 +67,6 @@ namespace IERAX_MissionControl
         private void HandleNavControllerOutput(MAVLink.MAVLinkMessage message)
         {
             var navControllerOutput = (MAVLink.mavlink_nav_controller_output_t)message.data;
-            Console.WriteLine("inside handlenavcontrol");
             // Distance to the waypoint (in meters)
             double distanceToWP = navControllerOutput.wp_dist;
 
@@ -82,7 +81,7 @@ namespace IERAX_MissionControl
     
 
             // Optionally, print to the console for debugging
-            Console.WriteLine($"Distance to WP: {distanceToWP:F2} meters, Time to WP: {timeToWP:F2} seconds");
+            //Console.WriteLine($"Distance to WP: {distanceToWP:F2} meters, Time to WP: {timeToWP:F2} seconds");
         }
 
         private void HandleVFR_HUDOutput(MAVLink.MAVLinkMessage message)
@@ -98,9 +97,16 @@ namespace IERAX_MissionControl
                                                                // Update the global variable
             DroneGroundSpeed = vfrHud.groundspeed;
 
-            updateTextLabelGUI("GSpeedLabel", Groundspeed);
-            updateTextLabelGUI("ASpeedLabel", Airspeed);
-          
+
+    
+
+            updateTextLabelGUI("GSpeedLabel", string.IsNullOrEmpty(Groundspeed) ? "0.0" : Groundspeed);
+            updateTextLabelGUI("ASpeedLabel", string.IsNullOrEmpty(Airspeed) ? "0.0" : Airspeed);
+            /*updateTextLabelGUI("AltitudeLabel", string.IsNullOrEmpty(Altitude) ? "0.0" : Altitude);
+            updateTextLabelGUI("ClimbLabel", string.IsNullOrEmpty(ClimbRate) ? "0.0" : ClimbRate);
+            updateTextLabelGUI("HeadingLabel", string.IsNullOrEmpty(Heading) ? "0" : Heading);
+            updateTextLabelGUI("ThrottleLabel", string.IsNullOrEmpty(Throttle) ? "0" : Throttle);*/
+
         }
 
 

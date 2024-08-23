@@ -1026,15 +1026,18 @@ namespace IERAX_MissionControl
 
         public void UpdateTextLabelGUI (string labelName, string value)
         {
+      
             // Find the label by name
             Label label = FindLabelByName(labelName);
-
             // Update the label with the provided value
             UpdateTextLabelAction(label, value);
         }
 
         public void UpdateTextLabelAction(Control control, string value)
         {
+           
+            Console.WriteLine(control);
+
             if (control.InvokeRequired)
             {
                 // If called from a different thread, use Invoke to switch to the UI thread
@@ -1392,6 +1395,11 @@ namespace IERAX_MissionControl
         }
 
         private void AltimeterBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void GSpeedLabel_Click(object sender, EventArgs e)
         {
 
         }

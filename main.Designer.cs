@@ -49,11 +49,11 @@
             this.LandButton = new System.Windows.Forms.Button();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
-            this.AltimeterBox = new System.Windows.Forms.Label();
-            this.DroneMode = new System.Windows.Forms.Label();
             this.DistanceToWPLabel = new System.Windows.Forms.Label();
             this.TimeToWPLabel = new System.Windows.Forms.Label();
-            this.AirSpeedLabel = new System.Windows.Forms.Label();
+            this.DroneMode = new System.Windows.Forms.Label();
+            this.AltimeterBox = new System.Windows.Forms.Label();
+            this.ASpeedLabel = new System.Windows.Forms.Label();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.tableLayoutPanel2.SuspendLayout();
@@ -94,10 +94,10 @@
             this.AltHoldButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.AltHoldButton.Location = new System.Drawing.Point(494, 77);
+            this.AltHoldButton.Location = new System.Drawing.Point(492, 77);
             this.AltHoldButton.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.AltHoldButton.Name = "AltHoldButton";
-            this.AltHoldButton.Size = new System.Drawing.Size(237, 62);
+            this.AltHoldButton.Size = new System.Drawing.Size(236, 62);
             this.AltHoldButton.TabIndex = 11;
             this.AltHoldButton.Text = "AltHold Mode";
             this.AltHoldButton.UseVisualStyleBackColor = true;
@@ -108,10 +108,10 @@
             this.GuidedModeButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.GuidedModeButton.Location = new System.Drawing.Point(494, 5);
+            this.GuidedModeButton.Location = new System.Drawing.Point(492, 5);
             this.GuidedModeButton.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.GuidedModeButton.Name = "GuidedModeButton";
-            this.GuidedModeButton.Size = new System.Drawing.Size(237, 62);
+            this.GuidedModeButton.Size = new System.Drawing.Size(236, 62);
             this.GuidedModeButton.TabIndex = 12;
             this.GuidedModeButton.Text = "Guided Mode";
             this.GuidedModeButton.UseVisualStyleBackColor = true;
@@ -122,7 +122,7 @@
             this.StopFollowingShipButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.StopFollowingShipButton.Location = new System.Drawing.Point(1346, 75);
+            this.StopFollowingShipButton.Location = new System.Drawing.Point(1342, 75);
             this.StopFollowingShipButton.Name = "StopFollowingShipButton";
             this.StopFollowingShipButton.Size = new System.Drawing.Size(243, 66);
             this.StopFollowingShipButton.TabIndex = 14;
@@ -140,6 +140,7 @@
             this.GSpeedLabel.TabIndex = 15;
             this.GSpeedLabel.Text = "Ground Speed";
             this.GSpeedLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.GSpeedLabel.Click += new System.EventHandler(this.GSpeedLabel_Click);
             // 
             // ArmStatusBox
             // 
@@ -148,9 +149,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.ArmStatusBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.125F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ArmStatusBox.Location = new System.Drawing.Point(738, 75);
+            this.ArmStatusBox.Location = new System.Drawing.Point(735, 75);
             this.ArmStatusBox.Name = "ArmStatusBox";
-            this.ArmStatusBox.Size = new System.Drawing.Size(239, 27);
+            this.ArmStatusBox.Size = new System.Drawing.Size(238, 38);
             this.ArmStatusBox.TabIndex = 6;
             this.ArmStatusBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.ArmStatusBox.TextChanged += new System.EventHandler(this.ArmStatusBox_TextChanged);
@@ -164,7 +165,7 @@
             this.TakeOffButton.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.TakeOffButton.Cursor = System.Windows.Forms.Cursors.Default;
             this.TakeOffButton.ImageAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.TakeOffButton.Location = new System.Drawing.Point(984, 5);
+            this.TakeOffButton.Location = new System.Drawing.Point(980, 5);
             this.TakeOffButton.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.TakeOffButton.Name = "TakeOffButton";
             this.TakeOffButton.RightToLeft = System.Windows.Forms.RightToLeft.No;
@@ -181,10 +182,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.but_armdisarm.BackColor = System.Drawing.Color.Yellow;
-            this.but_armdisarm.Location = new System.Drawing.Point(741, 6);
+            this.but_armdisarm.Location = new System.Drawing.Point(738, 6);
             this.but_armdisarm.Margin = new System.Windows.Forms.Padding(6);
             this.but_armdisarm.Name = "but_armdisarm";
-            this.but_armdisarm.Size = new System.Drawing.Size(233, 60);
+            this.but_armdisarm.Size = new System.Drawing.Size(232, 60);
             this.but_armdisarm.TabIndex = 3;
             this.but_armdisarm.Text = "Arm/Disarm";
             this.but_armdisarm.UseVisualStyleBackColor = false;
@@ -195,10 +196,10 @@
             this.but_mission.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_mission.Location = new System.Drawing.Point(251, 78);
+            this.but_mission.Location = new System.Drawing.Point(250, 78);
             this.but_mission.Margin = new System.Windows.Forms.Padding(6);
             this.but_mission.Name = "but_mission";
-            this.but_mission.Size = new System.Drawing.Size(233, 60);
+            this.but_mission.Size = new System.Drawing.Size(232, 60);
             this.but_mission.TabIndex = 4;
             this.but_mission.Text = "Send Mission";
             this.but_mission.UseVisualStyleBackColor = true;
@@ -209,7 +210,7 @@
             this.ShipFollowingModeLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.ShipFollowingModeLabel.Location = new System.Drawing.Point(1346, 0);
+            this.ShipFollowingModeLabel.Location = new System.Drawing.Point(1342, 0);
             this.ShipFollowingModeLabel.Name = "ShipFollowingModeLabel";
             this.ShipFollowingModeLabel.Size = new System.Drawing.Size(243, 72);
             this.ShipFollowingModeLabel.TabIndex = 13;
@@ -221,10 +222,10 @@
             this.but_connect.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_connect.Location = new System.Drawing.Point(251, 6);
+            this.but_connect.Location = new System.Drawing.Point(250, 6);
             this.but_connect.Margin = new System.Windows.Forms.Padding(6);
             this.but_connect.Name = "but_connect";
-            this.but_connect.Size = new System.Drawing.Size(233, 60);
+            this.but_connect.Size = new System.Drawing.Size(232, 60);
             this.but_connect.TabIndex = 2;
             this.but_connect.Text = "Connect";
             this.but_connect.UseVisualStyleBackColor = true;
@@ -248,7 +249,7 @@
             this.cmb_baudrate.Location = new System.Drawing.Point(6, 78);
             this.cmb_baudrate.Margin = new System.Windows.Forms.Padding(6);
             this.cmb_baudrate.Name = "cmb_baudrate";
-            this.cmb_baudrate.Size = new System.Drawing.Size(233, 33);
+            this.cmb_baudrate.Size = new System.Drawing.Size(232, 33);
             this.cmb_baudrate.TabIndex = 1;
             this.cmb_baudrate.SelectedIndexChanged += new System.EventHandler(this.cmb_baudrate_SelectedIndexChanged);
             // 
@@ -261,7 +262,7 @@
             this.CMB_comport.Location = new System.Drawing.Point(6, 6);
             this.CMB_comport.Margin = new System.Windows.Forms.Padding(6);
             this.CMB_comport.Name = "CMB_comport";
-            this.CMB_comport.Size = new System.Drawing.Size(233, 33);
+            this.CMB_comport.Size = new System.Drawing.Size(232, 33);
             this.CMB_comport.TabIndex = 0;
             this.CMB_comport.SelectedIndexChanged += new System.EventHandler(this.CMB_comport_SelectedIndexChanged);
             this.CMB_comport.Click += new System.EventHandler(this.CMB_comport_Click);
@@ -278,7 +279,7 @@
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 12.878F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 17.68635F));
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 305F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 307F));
             this.tableLayoutPanel1.Controls.Add(this.but_connect, 1, 0);
             this.tableLayoutPanel1.Controls.Add(this.AltHoldButton, 2, 1);
             this.tableLayoutPanel1.Controls.Add(this.TakeOffButton, 4, 0);
@@ -313,7 +314,7 @@
             this.ShipInfoLabel.AutoSize = true;
             this.ShipInfoLabel.BackColor = System.Drawing.SystemColors.InfoText;
             this.ShipInfoLabel.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.ShipInfoLabel.Location = new System.Drawing.Point(1595, 0);
+            this.ShipInfoLabel.Location = new System.Drawing.Point(1591, 0);
             this.ShipInfoLabel.Margin = new System.Windows.Forms.Padding(3, 0, 0, 0);
             this.ShipInfoLabel.Name = "ShipInfoLabel";
             this.tableLayoutPanel1.SetRowSpan(this.ShipInfoLabel, 2);
@@ -329,7 +330,7 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.LandButton.BackColor = System.Drawing.Color.Lime;
-            this.LandButton.Location = new System.Drawing.Point(983, 75);
+            this.LandButton.Location = new System.Drawing.Point(979, 75);
             this.LandButton.Name = "LandButton";
             this.LandButton.Size = new System.Drawing.Size(357, 66);
             this.LandButton.TabIndex = 16;
@@ -343,7 +344,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.pictureBox1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.pictureBox1.Image = global::IERAX_MissionControl.Properties.Resources.ieraxlogo;
-            this.pictureBox1.Location = new System.Drawing.Point(1934, 0);
+            this.pictureBox1.Location = new System.Drawing.Point(1930, 0);
             this.pictureBox1.Margin = new System.Windows.Forms.Padding(0);
             this.pictureBox1.MaximumSize = new System.Drawing.Size(300, 0);
             this.pictureBox1.Name = "pictureBox1";
@@ -366,7 +367,7 @@
             this.tableLayoutPanel2.Controls.Add(this.TimeToWPLabel, 1, 2);
             this.tableLayoutPanel2.Controls.Add(this.DroneMode, 0, 3);
             this.tableLayoutPanel2.Controls.Add(this.AltimeterBox, 0, 1);
-            this.tableLayoutPanel2.Controls.Add(this.AirSpeedLabel, 0, 0);
+            this.tableLayoutPanel2.Controls.Add(this.ASpeedLabel, 0, 0);
             this.tableLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Right;
             this.tableLayoutPanel2.Location = new System.Drawing.Point(1935, 144);
             this.tableLayoutPanel2.Margin = new System.Windows.Forms.Padding(0);
@@ -382,33 +383,6 @@
             this.tableLayoutPanel2.Size = new System.Drawing.Size(306, 1170);
             this.tableLayoutPanel2.TabIndex = 17;
             this.tableLayoutPanel2.Paint += new System.Windows.Forms.PaintEventHandler(this.tableLayoutPanel2_Paint);
-            // 
-            // AltimeterBox
-            // 
-            this.AltimeterBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.AltimeterBox.AutoSize = true;
-            this.AltimeterBox.Location = new System.Drawing.Point(0, 194);
-            this.AltimeterBox.Margin = new System.Windows.Forms.Padding(0);
-            this.AltimeterBox.Name = "AltimeterBox";
-            this.AltimeterBox.Size = new System.Drawing.Size(150, 195);
-            this.AltimeterBox.TabIndex = 16;
-            this.AltimeterBox.Text = "Altimeter";
-            this.AltimeterBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // DroneMode
-            // 
-            this.DroneMode.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.DroneMode.AutoSize = true;
-            this.DroneMode.Location = new System.Drawing.Point(3, 584);
-            this.DroneMode.Name = "DroneMode";
-            this.DroneMode.Size = new System.Drawing.Size(144, 195);
-            this.DroneMode.TabIndex = 17;
-            this.DroneMode.Text = "Flight Controller Mode";
-            this.DroneMode.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // DistanceToWPLabel
             // 
@@ -436,18 +410,45 @@
             this.TimeToWPLabel.Text = "Time To WP";
             this.TimeToWPLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
-            // AirSpeedLabel
+            // DroneMode
             // 
-            this.AirSpeedLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.DroneMode.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.AirSpeedLabel.AutoSize = true;
-            this.AirSpeedLabel.Location = new System.Drawing.Point(3, 0);
-            this.AirSpeedLabel.Name = "AirSpeedLabel";
-            this.AirSpeedLabel.Size = new System.Drawing.Size(144, 194);
-            this.AirSpeedLabel.TabIndex = 20;
-            this.AirSpeedLabel.Text = "AirSpeed";
-            this.AirSpeedLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.DroneMode.AutoSize = true;
+            this.DroneMode.Location = new System.Drawing.Point(3, 584);
+            this.DroneMode.Name = "DroneMode";
+            this.DroneMode.Size = new System.Drawing.Size(144, 195);
+            this.DroneMode.TabIndex = 17;
+            this.DroneMode.Text = "Flight Controller Mode";
+            this.DroneMode.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // AltimeterBox
+            // 
+            this.AltimeterBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.AltimeterBox.AutoSize = true;
+            this.AltimeterBox.Location = new System.Drawing.Point(0, 194);
+            this.AltimeterBox.Margin = new System.Windows.Forms.Padding(0);
+            this.AltimeterBox.Name = "AltimeterBox";
+            this.AltimeterBox.Size = new System.Drawing.Size(150, 195);
+            this.AltimeterBox.TabIndex = 16;
+            this.AltimeterBox.Text = "Altimeter";
+            this.AltimeterBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // ASpeedLabel
+            // 
+            this.ASpeedLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.ASpeedLabel.AutoSize = true;
+            this.ASpeedLabel.Location = new System.Drawing.Point(3, 0);
+            this.ASpeedLabel.Name = "ASpeedLabel";
+            this.ASpeedLabel.Size = new System.Drawing.Size(144, 194);
+            this.ASpeedLabel.TabIndex = 20;
+            this.ASpeedLabel.Text = "AirSpeed";
+            this.ASpeedLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // MPIeraxMain
             // 
@@ -496,7 +497,7 @@
         public System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.Label DistanceToWPLabel;
         private System.Windows.Forms.Label TimeToWPLabel;
-        private System.Windows.Forms.Label AirSpeedLabel;
+        private System.Windows.Forms.Label ASpeedLabel;
     }
 }
 
