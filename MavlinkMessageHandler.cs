@@ -18,6 +18,7 @@ namespace IERAX_MissionControl
 
         public PointLatLng DroneCurrentPosition { get; set; }
         public float DroneGroundSpeed { get; set; }
+        public double DroneHeading { get; set; }
 
 
         public MavlinkMessageHandler(Action<PointLatLng> updateDroneMarkerAction, Action<bool> updateArmStatusBoxAction,
@@ -55,7 +56,13 @@ namespace IERAX_MissionControl
                 case (byte)MAVLink.MAVLINK_MSG_ID.VFR_HUD:
                     HandleVFR_HUDOutput(message);
                     break;
-                 
+                case (byte)MAVLink.MAVLINK_MSG_ID.SYS_STATUS:
+                   HandleSysStatusOutput(message);
+                    break;
+                case (byte)MAVLink.MAVLINK_MSG_ID.WIND:
+                    HandleWindMessageOutput(message);
+                    break;
+
 
                 default:
                     //Console.WriteLine($"Unhandled MAVLink message: {message.msgtypename}");
@@ -71,7 +78,7 @@ namespace IERAX_MissionControl
             double distanceToWP = navControllerOutput.wp_dist;
 
             // Assuming you have a known drone speed (convert to meters per second)
-            double droneSpeedMps = 11.11; // 40 km/h
+            double droneSpeedMps = DroneGroundSpeed;
 
             // Time to the waypoint (in seconds)
             double timeToWP = distanceToWP / droneSpeedMps;
@@ -96,16 +103,63 @@ namespace IERAX_MissionControl
             string Throttle = vfrHud.throttle.ToString();      // Throttle percentage
                                                                // Update the global variable
             DroneGroundSpeed = vfrHud.groundspeed;
-
+            DroneHeading = vfrHud.heading;
 
     
 
             updateTextLabelGUI("GSpeedLabel", string.IsNullOrEmpty(Groundspeed) ? "0.0" : Groundspeed);
             updateTextLabelGUI("ASpeedLabel", string.IsNullOrEmpty(Airspeed) ? "0.0" : Airspeed);
+            updateTextLabelGUI("HeadingLabel", string.IsNullOrEmpty(Heading) ? "0" : Heading);
             /*updateTextLabelGUI("AltitudeLabel", string.IsNullOrEmpty(Altitude) ? "0.0" : Altitude);
             updateTextLabelGUI("ClimbLabel", string.IsNullOrEmpty(ClimbRate) ? "0.0" : ClimbRate);
             updateTextLabelGUI("HeadingLabel", string.IsNullOrEmpty(Heading) ? "0" : Heading);
             updateTextLabelGUI("ThrottleLabel", string.IsNullOrEmpty(Throttle) ? "0" : Throttle);*/
+
+        }
+
+        private void HandleSysStatusOutput(MAVLink.MAVLinkMessage message)
+        {
+            var sysStatus = (MAVLink.mavlink_sys_status_t)message.data;
+
+            // Extract and format relevant fields
+            string BatteryVoltage = (sysStatus.voltage_battery / 1000.0).ToString("F2") + "V";  // Battery voltage in volts
+            string BatteryCurrent = (sysStatus.current_battery / 100.0).ToString("F2") + "A";   // Battery current in amperes
+            string BatteryRemaining = sysStatus.battery_remaining.ToString() + "%";             // Battery remaining in percentage
+            string DropRateComm = (sysStatus.drop_rate_comm / 100.0).ToString("F2") + "%";      // Communication drop rate
+            string ErrorsComm = sysStatus.errors_comm.ToString();                               // Communication errors
+            string Load = (sysStatus.load / 10.0).ToString("F1") + "%";                         // CPU load in percentage
+
+        
+
+            // Update GUI labels
+            //updateTextLabelGUI("BatteryVoltageLabel", string.IsNullOrEmpty(BatteryVoltage) ? "0.0V" : BatteryVoltage);
+            //updateTextLabelGUI("BatteryCurrentLabel", string.IsNullOrEmpty(BatteryCurrent) ? "0.0A" : BatteryCurrent);
+            updateTextLabelGUI("BatteryRemainingLabel", string.IsNullOrEmpty(BatteryRemaining) ? "0%" : BatteryRemaining);
+           // updateTextLabelGUI("DropRateCommLabel", string.IsNullOrEmpty(DropRateComm) ? "0.0%" : DropRateComm);
+           // updateTextLabelGUI("ErrorsCommLabel", string.IsNullOrEmpty(ErrorsComm) ? "0" : ErrorsComm);
+           // updateTextLabelGUI("LoadLabel", string.IsNullOrEmpty(Load) ? "0.0%" : Load);
+
+        }
+
+        private void HandleWindMessageOutput(MAVLink.MAVLinkMessage message)
+        {
+            
+                var wind = (MAVLink.mavlink_wind_t)message.data;
+
+                // Extract and format relevant fields
+                string WindSpeed = wind.speed.ToString("F2") + "m/s";       // Wind speed in m/s
+                string WindDirection = wind.direction.ToString("F1") + "°"; // Wind direction in degrees
+                string WindSpeedZ = wind.speed_z.ToString("F2") + "m/s";    // Vertical wind speed in m/s
+
+                // Update global variables if necessary
+                //DroneWindSpeed = wind.speed;
+                //DroneWindDirection = wind.direction;
+
+                // Update GUI labels
+                updateTextLabelGUI("WindSpeedLabel", string.IsNullOrEmpty(WindSpeed) ? "0.0m/s" : WindSpeed);
+                updateTextLabelGUI("WindDirectionLabel", string.IsNullOrEmpty(WindDirection) ? "0.0°" : WindDirection);
+                //updateTextLabelGUI("WindSpeedZLabel", string.IsNullOrEmpty(WindSpeedZ) ? "0.0m/s" : WindSpeedZ);
+          
 
         }
 

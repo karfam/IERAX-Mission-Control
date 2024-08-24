@@ -22,9 +22,40 @@ namespace IERAX_MissionControl
         // Additional properties
         public string ShipName { get; set; }
         public string MMSI { get; set; }
-        public double Heading { get; set; }
-        public double Speed { get; set; }
+
+        private double heading;
+        public double Heading
+        {
+            get => heading;
+            set
+            {
+                if (heading != value)
+                {
+                    heading = value;
+                    HeadingChanged?.Invoke();
+                }
+            }
+        }
+
+        private double speed;
+        public double Speed
+        {
+            get => speed;
+            set
+            {
+                if (speed != value)
+                {
+                    speed = value;
+                    SpeedChanged?.Invoke();
+                }
+            }
+        }
         public string VesselType { get; set; }
+
+        public event Action PositionChanged;
+        public event Action SpeedChanged;
+        public event Action HeadingChanged;
+
 
         // List to store historical positions
         public List<HistoryMarker> HistoryMarkers { get; private set; } = new List<HistoryMarker>();
@@ -35,6 +66,20 @@ namespace IERAX_MissionControl
         // Add a property to store the previous position
         public PointLatLng? PreviousPosition { get; set; }
 
+        // Property to store the previous position
+        private PointLatLng? shipPosition;
+        public PointLatLng? ShipPosition
+        {
+            get => shipPosition;
+            set
+            {
+                if (shipPosition != value)
+                {
+                    shipPosition = value;
+                    PositionChanged?.Invoke();
+                }
+            }
+        }
 
         public ShipMarker(PointLatLng p) : base(p)
         {

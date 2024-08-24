@@ -22,6 +22,7 @@ using IERAX_MissionControl.Properties;
 using System.Net.Sockets;
 using System.Data.Entity.Core.Metadata.Edm;
 using System.Net;
+using static MAVLink;
 
 
 
@@ -70,12 +71,7 @@ namespace IERAX_MissionControl
             InitializeMavlinkHandler();
             InitializeComponent();
             InitializeMap();
-            //InitializeInfoPanel();
             InitializeWebSocket();
-
-            // Attach resize event
-            //this.Resize += Form1_Resize;
-
         }
 
 
@@ -101,53 +97,13 @@ namespace IERAX_MissionControl
             gMapControl1.Overlays.Add(markersOverlay);
 
             // Create the drone marker at a default position
-            droneMarker = new DroneMarker(new PointLatLng(37.7128, 21.0060)); // Example coordinates
+            droneMarker = new DroneMarker(new PointLatLng(37.7128, 21.0060),mavlinkMessageHandler); // Example coordinates
             markersOverlay.Markers.Add(droneMarker);
 
             // Refresh the map to ensure the marker is displayed
             gMapControl1.Refresh();
 
         }
-
-     /*   private void Form1_Resize(object sender, EventArgs e)
-        {
-            PositionInfoPanel();
-        }*/
-
- /*       private void InitializeInfoPanel()
-        {
-            // Initialize the panel
-            infoPanel = new Panel
-            {
-                Size = new Size(200, 100),
-                BackColor = Color.FromArgb(200, 255, 255, 255), // Semi-transparent white
-                BorderStyle = BorderStyle.FixedSingle,
-                Visible = false
-            };
-
-            // Initialize the label to display information
-            infoLabel = new Label
-            {
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10),
-            };
-
-            infoPanel.Controls.Add(infoLabel);
-
-            // Add the panel to the form or gMapControl
-            this.Controls.Add(infoPanel);
-
-            // Position the panel in the top-right corner of the map
-            PositionInfoPanel();
-        }*/
-
-   /*     private void PositionInfoPanel()
-        {
-            // Position the panel in the top-right corner of the gMapControl
-            infoPanel.Location = new Point(gMapControl1.Width - infoPanel.Width - 10, 50);
-            infoPanel.BringToFront();
-        }*/
 
         private async void InitializeWebSocket()
         {
@@ -285,12 +241,31 @@ namespace IERAX_MissionControl
                 Task.Run(() => HandleMavlinkMessages(tcpStream));
 
                 Console.WriteLine($"Connected to drone at {ip}:{port}");
+
+                // request streams at 2 hz
+                var buffer = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM,
+                    new MAVLink.mavlink_request_data_stream_t()
+                    {
+                        req_message_rate = 2,
+                        req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.ALL,
+                        start_stop = 1,
+                        target_component = compid,
+                        target_system = sysid
+                    });
+
+                SendPacket(buffer);
+
+
+
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to connect to {ip}:{port} - {ex.Message}");
             }
+
         }
+
+  
 
 
         private void HandleMavlinkMessages(NetworkStream stream)
@@ -346,7 +321,7 @@ namespace IERAX_MissionControl
                 if (droneMarker == null)
                 {
                     // Create the drone marker if it doesn't exist
-                    droneMarker = new DroneMarker(position);
+                    droneMarker = new DroneMarker(position,mavlinkMessageHandler);
                     markersOverlay.Markers.Add(droneMarker);
                 }
                 else
@@ -743,9 +718,10 @@ namespace IERAX_MissionControl
 
 
         private void FlyToLocation(PointLatLng point)
+
         {
             // Ensure the drone is in Guided mode
-            SwitchToGuidedMode();
+            //SwitchToGuidedMode();
 
             // Convert latitude and longitude from double to int format required by FlyToWaypoint
             int lat_int = (int)(point.Lat * 1e7);
@@ -1026,6 +1002,8 @@ namespace IERAX_MissionControl
 
         public void UpdateTextLabelGUI (string labelName, string value)
         {
+
+            //Console.WriteLine(labelName);
       
             // Find the label by name
             Label label = FindLabelByName(labelName);
@@ -1036,7 +1014,7 @@ namespace IERAX_MissionControl
         public void UpdateTextLabelAction(Control control, string value)
         {
            
-            Console.WriteLine(control);
+            
 
             if (control.InvokeRequired)
             {
@@ -1216,42 +1194,65 @@ namespace IERAX_MissionControl
             }
             // Update the label to indicate that ship following is disabled
             ShipFollowingModeLabel.Text = "SHIP FOLLOWING DISABLED";
-        
+
+            if (targetShipMarker != null)
+            {
+                targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
+                targetShipMarker.SpeedChanged -= OnShipMarkerUpdated;
+                targetShipMarker.HeadingChanged -= OnShipMarkerUpdated;
+            }
+
             ShipFollowingModeLabel.BackColor = Color.Green; // Set the label background to green
             targetShipMarker = null;
         }
 
         private void InterceptShip(ShipMarker shipMarker)
+
         {
+            // Unsubscribe from previous shipMarker events, if any
+            if (targetShipMarker != null)
+            {
+                targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
+                targetShipMarker.SpeedChanged -= OnShipMarkerUpdated;
+                targetShipMarker.HeadingChanged -= OnShipMarkerUpdated;
+            }
+
             // Store the target ship marker
             targetShipMarker = shipMarker;
 
-            // Start a timer to continuously update the drone's intercept position
-            if (flyToShipTimer == null)
-            {
-                flyToShipTimer = new System.Windows.Forms.Timer();
-                flyToShipTimer.Interval = 1000; // Update every second
-                flyToShipTimer.Tick += InterceptShipTimer_Tick;
-            }
-
-            flyToShipTimer.Start();
+            // Subscribe to the shipMarker events
+            targetShipMarker.PositionChanged += OnShipMarkerUpdated;
+            targetShipMarker.SpeedChanged += OnShipMarkerUpdated;
+            targetShipMarker.HeadingChanged += OnShipMarkerUpdated;
 
             // Update the label to indicate that intercepting is enabled
             ShipFollowingModeLabel.Text = $"Intercepting {shipMarker.ShipName}";
             ShipFollowingModeLabel.BackColor = Color.Red;
 
             // Calculate the initial intercept position
-            double droneSpeedKmh = 40.0;
-            double droneSpeedMps = droneSpeedKmh / 3.6;
-            double shipSpeedMps = shipMarker.Speed * 0.514444;
+            UpdateInterceptPosition();
+        }
+
+        // Method to handle ShipMarker updates
+        private void OnShipMarkerUpdated()
+        {
+            UpdateInterceptPosition();
+        }
+
+        // Method to update the intercept position
+        private void UpdateInterceptPosition()
+        {
+            double droneSpeedMps = GetDroneGroundSpeed();
+            double shipSpeedMps = targetShipMarker.Speed * 0.514444;
 
             var dronePosition = GetDroneCurrentPosition();
-            double distanceToShip = GetDistance(dronePosition, shipMarker.Position);
+            double distanceToShip = GetDistance(dronePosition, targetShipMarker.Position);
             double timeToIntercept = distanceToShip / droneSpeedMps;
 
-            PointLatLng interceptPosition = CalculateInterceptPosition(shipMarker.Position, shipMarker.Heading, shipSpeedMps, timeToIntercept);
+            PointLatLng interceptPosition = CalculateInterceptPosition(targetShipMarker.Position, targetShipMarker.Heading, shipSpeedMps, timeToIntercept);
 
-            // Add the intercept marker
+            // Add or update the intercept marker
+
             AddInterceptMarker(interceptPosition);
         }
 
@@ -1271,6 +1272,10 @@ namespace IERAX_MissionControl
             InterceptMarker interceptMarker = new InterceptMarker(interceptPosition);
             markersOverlay.Markers.Add(interceptMarker);
 
+            FlyToLocation(interceptPosition);
+
+            Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
+
             // Refresh the overlay
             gMapControl1.Refresh();
         }
@@ -1279,12 +1284,14 @@ namespace IERAX_MissionControl
 
 
 
-        private void InterceptShipTimer_Tick(object sender, EventArgs e)
+       /* private void InterceptShipTimer_Tick(object sender, EventArgs e)
+
         {
+         
             if (targetShipMarker != null && targetShipMarker.Speed > 0)
             {
-                double droneSpeedKmh = 40.0;
-                double droneSpeedMps = droneSpeedKmh / 3.6;
+                Console.WriteLine ("Inside Intercept ShipTimetick");
+                double droneSpeedMps = GetDroneGroundSpeed();
                 double shipSpeedMps = targetShipMarker.Speed * 0.514444;
 
                 var dronePosition = GetDroneCurrentPosition();
@@ -1306,10 +1313,7 @@ namespace IERAX_MissionControl
                 // Stop following if the ship stops or the speed is zero
                 StopFlyToShip();
             }
-        }
-
-
-
+        }*/
 
         private PointLatLng CalculateInterceptPosition(PointLatLng shipPosition, double shipHeading, double shipSpeedMps, double timeInSeconds)
         {
@@ -1333,6 +1337,18 @@ namespace IERAX_MissionControl
         {
             PointLatLng currentPosition = mavlinkMessageHandler.DroneCurrentPosition;
             return currentPosition;
+        }
+
+        private Double GetDroneGroundSpeed()
+        {
+           Double currentSpeed = mavlinkMessageHandler.DroneGroundSpeed;
+            return currentSpeed;
+        }
+
+        private Double GetDroneCurrentHeading()
+            {
+            Double currentHeading = mavlinkMessageHandler.DroneHeading;
+            return currentHeading;
         }
 
 
@@ -1362,6 +1378,14 @@ namespace IERAX_MissionControl
         private void StopFollowingShipButton_Click(object sender, EventArgs e)
         {
             StopFlyToShip();
+
+                if (targetShipMarker != null)
+            {
+                targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
+                targetShipMarker.SpeedChanged -= OnShipMarkerUpdated;
+                targetShipMarker.HeadingChanged -= OnShipMarkerUpdated;
+            }
+         
         }
 
         private void ArmStatusBox_TextChanged(object sender, EventArgs e)
@@ -1400,6 +1424,21 @@ namespace IERAX_MissionControl
         }
 
         private void GSpeedLabel_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label3_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void RTLButton_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label10_Click(object sender, EventArgs e)
         {
 
         }
