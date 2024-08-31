@@ -63,7 +63,8 @@ namespace IERAX_MissionControl
 
         private System.Windows.Forms.Timer flyToShipTimer;
         private ShipMarker targetShipMarker;
-     
+        private const double EarthRadius = 6378137.0;  // Earth's radius in meters
+
 
 
         public MPIeraxMain()
@@ -1244,12 +1245,20 @@ namespace IERAX_MissionControl
         {
             double droneSpeedMps = GetDroneGroundSpeed();
             double shipSpeedMps = targetShipMarker.Speed * 0.514444;
+            double droneHeadingDegrees = GetDroneCurrentHeading();
 
             var dronePosition = GetDroneCurrentPosition();
             double distanceToShip = GetDistance(dronePosition, targetShipMarker.Position);
             double timeToIntercept = distanceToShip / droneSpeedMps;
 
             PointLatLng interceptPosition = CalculateInterceptPosition(targetShipMarker.Position, targetShipMarker.Heading, shipSpeedMps, timeToIntercept);
+
+            PointLatLng interceptLatLng = CalculateIntercept(
+           dronePosition, droneSpeedMps, droneHeadingDegrees,
+           targetShipMarker.Position, targetShipMarker.Speed, targetShipMarker.Heading
+       );
+
+            Console.WriteLine($"Intercept Coordinates: Latitude {interceptLatLng.Lat:F6}, Longitude {interceptLatLng.Lng:F6}");
 
             // Add or update the intercept marker
 
@@ -1280,40 +1289,6 @@ namespace IERAX_MissionControl
             gMapControl1.Refresh();
         }
 
-
-
-
-
-       /* private void InterceptShipTimer_Tick(object sender, EventArgs e)
-
-        {
-         
-            if (targetShipMarker != null && targetShipMarker.Speed > 0)
-            {
-                Console.WriteLine ("Inside Intercept ShipTimetick");
-                double droneSpeedMps = GetDroneGroundSpeed();
-                double shipSpeedMps = targetShipMarker.Speed * 0.514444;
-
-                var dronePosition = GetDroneCurrentPosition();
-                double distanceToShip = GetDistance(dronePosition, targetShipMarker.Position);
-                double timeToIntercept = distanceToShip / droneSpeedMps;
-
-                PointLatLng interceptPosition = CalculateInterceptPosition(targetShipMarker.Position, targetShipMarker.Heading, shipSpeedMps, timeToIntercept);
-
-                // Update the intercept marker position
-                AddInterceptMarker(interceptPosition);
-
-                // Command the drone to fly to the intercept position
-                FlyToLocation(interceptPosition);
-
-                Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
-            }
-            else
-            {
-                // Stop following if the ship stops or the speed is zero
-                StopFlyToShip();
-            }
-        }*/
 
         private PointLatLng CalculateInterceptPosition(PointLatLng shipPosition, double shipHeading, double shipSpeedMps, double timeInSeconds)
         {
@@ -1442,6 +1417,79 @@ namespace IERAX_MissionControl
         {
 
         }
+
+        public static PointLatLng CalculateIntercept(
+        PointLatLng dronePos, double droneSpeed, double droneHeadingDegrees,
+        PointLatLng shipPos, double shipSpeed, double shipHeadingDegrees)
+        {
+            // Convert drone and ship positions to ENU coordinates relative to drone's initial position
+            var droneENU = LatLonToENU(dronePos, dronePos);
+            var shipENU = LatLonToENU(shipPos, dronePos);
+
+            // Convert headings to radians
+            double droneHeadingRadians = DegreesToRadians(droneHeadingDegrees);
+            double shipHeadingRadians = DegreesToRadians(shipHeadingDegrees);
+
+            // Calculate the velocity components of the drone and ship
+            double droneSpeedX = droneSpeed * Math.Cos(droneHeadingRadians);
+            double droneSpeedY = droneSpeed * Math.Sin(droneHeadingRadians);
+            double shipSpeedX = shipSpeed * Math.Cos(shipHeadingRadians);
+            double shipSpeedY = shipSpeed * Math.Sin(shipHeadingRadians);
+
+            // Calculate the relative velocity components
+            double relativeSpeedX = droneSpeedX - shipSpeedX;
+            double relativeSpeedY = droneSpeedY - shipSpeedY;
+
+            // Calculate the relative position
+            double relativePosX = shipENU.x - droneENU.x;
+            double relativePosY = shipENU.y - droneENU.y;
+
+            // Calculate the time to intercept
+            double tIntercept = (relativePosX * relativeSpeedX + relativePosY * relativeSpeedY) /
+                                (relativeSpeedX * relativeSpeedX + relativeSpeedY * relativeSpeedY);
+
+            // Calculate the intercept coordinates in ENU
+            double xIntercept = droneENU.x + droneSpeedX * tIntercept;
+            double yIntercept = droneENU.y + droneSpeedY * tIntercept;
+
+            // Convert the intercept ENU coordinates back to latitude and longitude
+            return ENUToLatLng(xIntercept, yIntercept, dronePos);
+        }
+
+        private static (double x, double y) LatLonToENU(PointLatLng point, PointLatLng reference)
+        {
+            double dLat = DegreesToRadians(point.Lat - reference.Lat);
+            double dLng = DegreesToRadians(point.Lng - reference.Lng);
+
+            double x = EarthRadius * dLng * Math.Cos(DegreesToRadians(reference.Lat)); // East
+            double y = EarthRadius * dLat; // North
+
+            return (x, y);
+        }
+
+        private static PointLatLng ENUToLatLng(double x, double y, PointLatLng reference)
+        {
+            double dLat = y / EarthRadius;
+            double dLng = x / (EarthRadius * Math.Cos(DegreesToRadians(reference.Lat)));
+
+            double lat = reference.Lat + RadiansToDegrees(dLat);
+            double lng = reference.Lng + RadiansToDegrees(dLng);
+
+            return new PointLatLng(lat, lng);
+        }
+
+        private static double DegreesToRadians(double degrees)
+        {
+            return degrees * (Math.PI / 180.0);
+        }
+
+        private static double RadiansToDegrees(double radians)
+        {
+            return radians * (180.0 / Math.PI);
+        }
+
+
+
     }
 
 }
