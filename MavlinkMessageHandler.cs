@@ -39,6 +39,7 @@ namespace IERAX_MissionControl
         {
             switch (message.msgid)
             {
+            
                 case (byte)MAVLink.MAVLINK_MSG_ID.HEARTBEAT:
                     HandleHeartbeatMessage(message);
                     break;
@@ -209,12 +210,14 @@ namespace IERAX_MissionControl
             DroneCurrentPosition = position;
 
             // Update the drone marker using the provided delegate
-            updateDroneMarkerAction(position);
+           
+            // Invoke the delegate to update the marker
+            updateDroneMarkerAction?.Invoke(position);
 
             // Update the AltimeterBox with the altitude
             updateAltimeterBoxAction(altitude);
 
-            //Console.WriteLine($"GLOBAL_POSITION_INT: Lat={latitude}, Lng={longitude}, Alt={altitude}");
+            Console.WriteLine($"GLOBAL_POSITION_INT: Lat={latitude}, Lng={longitude}, Alt={altitude}");
         }
 
     

@@ -23,6 +23,7 @@ using System.Net.Sockets;
 using System.Data.Entity.Core.Metadata.Edm;
 using System.Net;
 using static MAVLink;
+using System.IO;
 
 
 
@@ -53,7 +54,16 @@ namespace IERAX_MissionControl
         private NetworkStream tcpStream; // Store the TCP stream for the connection
         private UdpClient udpClient;
         private IPEndPoint remoteEndPoint;
-       
+        // Variables to track maximum values and timestamps
+        private float maxCO2 = float.MinValue;
+        private string maxCO2Timestamp = string.Empty;
+
+        private float maxHDCO2 = float.MinValue;
+        private string maxHDCO2Timestamp = string.Empty;
+
+        private readonly List<MAVLinkData> paramValueBatch = new List<MAVLinkData>(); // For batch storage
+        private const int BatchSize = 10; // Adjust batch size as needed
+
 
         private Dictionary<string, AisData> cachedAisData = new Dictionary<string, AisData>();
 
@@ -144,7 +154,7 @@ namespace IERAX_MissionControl
                         else
                         {
                             var message = Encoding.Default.GetString(buffer, 0, result.Count);
-                            // Console.WriteLine($"Received {message}");
+                            //Console.WriteLine($"Received {message}");
                             var aisData = JsonConvert.DeserializeObject<AisData>(message);
                             if (aisData != null)
                             {
@@ -192,45 +202,63 @@ namespace IERAX_MissionControl
         {
             string selectedConnection = CMB_comport.Text;
 
-            // Check if the selected option is an IP:Port format (indicating a TCP connection)
-            if (selectedConnection.Contains(":"))
+            try
             {
-                // Parse the IP and port
-                string[] parts = selectedConnection.Split(':');
-                string ip = parts[0];
-                int port = int.Parse(parts[1]);
-
-                // Handle TCP connection
-                ConnectViaTCP(ip, port);
-            }
-            else
-            {
-                // Handle serial port connection as before
-
-                // If the port is open, close it
-                if (serialPort1.IsOpen)
+                // Check if the selected option is an IP:Port format (indicating a TCP connection)
+                if (selectedConnection.Contains(":"))
                 {
-                    serialPort1.Close();
-                    return;
+                    // Parse the IP and port
+                    string[] parts = selectedConnection.Split(':');
+                    string ip = parts[0];
+                    int port = int.Parse(parts[1]);
+
+                    // Handle TCP connection
+                    ConnectViaTCP(ip, port);
                 }
+                else
+                {
+                    // Handle serial port connection as before
 
-                // Set the comport options
-                serialPort1.PortName = selectedConnection;
-                serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+                    // If the port is open, close it
+                    if (serialPort1.IsOpen)
+                    {
+                        // If the port is open, close it and update the button
+                        serialPort1.Close();
+                        but_connect.Text = "Connect";
+                        but_connect.BackColor = Color.Gray;
+                    }
+                    else
+                    {
+                        // Set the comport options
+                        serialPort1.PortName = selectedConnection;
+                        serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
 
-                // Open the comport
-                serialPort1.Open();
+                        // Open the comport
+                        serialPort1.Open();
 
-                // Set timeout to 2 seconds
-                serialPort1.ReadTimeout = 2000;
+                        // Set timeout to 2 seconds
+                        serialPort1.ReadTimeout = 2000;
 
-                // Start a background worker for handling the connection
-                BackgroundWorker bgw = new BackgroundWorker();
-                bgw.DoWork += bgw_DoWork;
-                bgw.RunWorkerAsync();
+                        // Update the button when connected
+                        but_connect.Text = "Disconnect";
+                        but_connect.BackColor = Color.Green;
+
+                        // Start a background worker for handling the connection
+                        BackgroundWorker bgw = new BackgroundWorker();
+                        bgw.DoWork += bgw_DoWork;
+                        bgw.RunWorkerAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Reset the button to the default state in case of an error
+                but_connect.Text = "Connect";
+                but_connect.BackColor = Color.Gray;
             }
         }
-
+        
         private void ConnectViaTCP(string ip, int port)
         {
             try
@@ -239,37 +267,21 @@ namespace IERAX_MissionControl
                 tcpStream = client.GetStream();
                 isTcpConnection = true;
 
-                Task.Run(() => HandleMavlinkMessages(tcpStream));
-
                 Console.WriteLine($"Connected to drone at {ip}:{port}");
 
-                // request streams at 2 hz
-                var buffer = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM,
-                    new MAVLink.mavlink_request_data_stream_t()
-                    {
-                        req_message_rate = 2,
-                        req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.ALL,
-                        start_stop = 1,
-                        target_component = compid,
-                        target_system = sysid
-                    });
-
-                SendPacket(buffer);
-
-
-
+                // Start handling MAVLink messages
+                Task.Run(() => HandleMavlinkMessages(tcpStream));
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to connect to {ip}:{port} - {ex.Message}");
             }
-
         }
 
-  
 
 
-        private void HandleMavlinkMessages(NetworkStream stream)
+
+        private void HandleMavlinkMessages(Stream stream)
         {
             MAVLink.MavlinkParse mavlink = new MAVLink.MavlinkParse();
 
@@ -279,37 +291,119 @@ namespace IERAX_MissionControl
                 {
                     MAVLink.MAVLinkMessage message = mavlink.ReadPacket(stream);
 
-                    if (message != null)
+                    if (message == null || message.data == null)
+                        continue;
+                    //Console.WriteLine($"Received MAVLink message: sysid={message.sysid}, msgid={message.msgid}, msgtypename={message.msgtypename}");
+                    // Handle messages from sysid=1 (ardupilot cube)
+                    if (message.sysid == 1)
                     {
-                        // Check if the message's sysid is 1
-                        if (message.sysid == 1)
-                        {
-                           //Console.WriteLine($"Received MAVLink message: msgid={message.msgid}, sysid={message.sysid}, compid={message.compid}, msgtypename={message.msgtypename}");
-
-                            // Handle known messages
-                            mavlinkMessageHandler.HandleMavlinkMessage(message);
-                        }
-                        else
-                        {
-                           // Console.WriteLine($"Ignored message from sysid={message.sysid}, expected sysid=1");
-                        }
+                        // Delegate handling to the message handler
+                        mavlinkMessageHandler.HandleMavlinkMessage(message);
                     }
-                    else
+                    // Handle messages from sysid=10 (CO2 sensors)
+                    else if (message.sysid == 10)
                     {
-                        Console.WriteLine("Received null message.");
+                        HandleSensorMessage(message);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error receiving MAVLink message: {ex.Message}");
+                    Console.WriteLine($"Error handling MAVLink message: {ex.Message}");
                     break;
                 }
             }
         }
 
 
+        private void HandleSensorMessage(MAVLink.MAVLinkMessage message)
+        {
+            if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.PARAM_VALUE)
+            {
+                var paramValue = (MAVLink.mavlink_param_value_t)message.data;
 
+                // Extract parameter name and value
+                string paramName = ExtractParamName(paramValue.param_id);
+                float paramValueFloat = paramValue.param_value;
+                string currentTimestamp = DateTime.Now.ToString("HH:mm:ss");
 
+                // Update maximum PPM values and timestamps
+                if (paramName == "CO2")
+                {
+                    if (paramValueFloat > maxCO2)
+                    {
+                        maxCO2 = paramValueFloat;
+                        maxCO2Timestamp = currentTimestamp;
+
+                        // Update the TextBox
+                        UpdateMaxValueTextBox(txtCO2max, maxCO2, maxCO2Timestamp);
+                    }
+
+                    // Update real-time CO2 value in txtCO2
+                    UpdateTextBox(txtCO2, paramValueFloat.ToString("F2"));
+                }
+                else if (paramName == "HDCO2")
+                {
+                    if (paramValueFloat > maxHDCO2)
+                    {
+                        maxHDCO2 = paramValueFloat;
+                        maxHDCO2Timestamp = currentTimestamp;
+
+                        // Update the TextBox
+                        UpdateMaxValueTextBox(txtHDCO2max, maxHDCO2, maxHDCO2Timestamp);
+                    }
+
+                    // Update real-time HDCO2 value in txtHDCO2
+                    UpdateTextBox(txtHDCO2, paramValueFloat.ToString("F2"));
+                }
+
+               // Console.WriteLine($"Received: param={paramName}, value={paramValueFloat}, timestamp={currentTimestamp}");
+            }
+        }
+
+        // Helper method to update the maximum value TextBox
+        private void UpdateMaxValueTextBox(Label textBox, float maxValue, string timestamp)
+        {
+            if (textBox.InvokeRequired)
+            {
+                textBox.Invoke(new Action(() =>
+                {
+                    textBox.Text = $"{maxValue:F2} ({timestamp})";
+                    textBox.ForeColor = Color.Red; // Set text color to red
+                }));
+            }
+            else
+            {
+                textBox.Text = $"{maxValue:F2} ({timestamp})";
+                textBox.ForeColor = Color.Red; // Set text color to red
+            }
+        }
+
+        // Helper method to update real-time value TextBox
+        private void UpdateTextBox(Label textBox, string value)
+        {
+            if (textBox.InvokeRequired)
+            {
+                textBox.Invoke(new Action(() => textBox.Text = value));
+            }
+            else
+            {
+                textBox.Text = value;
+            }
+        }
+
+        // Helper method to extract and clean parameter names
+        private string ExtractParamName(byte[] paramId)
+        {
+            int length = Array.IndexOf(paramId, (byte)0); // Find the first null character
+            if (length == -1) length = paramId.Length;   // If no null, use full length
+
+            return new string(paramId.Take(length)
+                                      .Select(b => (char)b)
+                                      .Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c) || char.IsPunctuation(c))
+                                      .ToArray());
+        }
+
+      
 
         private void UpdateDroneMarker(PointLatLng position)
         {
@@ -344,76 +438,8 @@ namespace IERAX_MissionControl
         //EDO EXOUME TON ASYNC WORKER
         void bgw_DoWork(object sender, DoWorkEventArgs e)
         {
-            while (serialPort1.IsOpen)
-            {
-                try
-                {
-                    MAVLink.MAVLinkMessage packet;
-                    lock (readlock)
-                    {
-                        // read any valid packet from the port
-                        packet = mavlink.ReadPacket(serialPort1.BaseStream);
 
-                        // check its valid
-                        if (packet == null || packet.data == null)
-                            continue;
-                    }
-
-                    // check to see if its a hb packet from the comport
-                    if (packet.data.GetType() == typeof(MAVLink.mavlink_heartbeat_t))
-                    {
-                        var hb = (MAVLink.mavlink_heartbeat_t)packet.data;
-
-                        // save the sysid and compid of the seen MAV
-                        sysid = packet.sysid;
-                        compid = packet.compid;
-
-                        // request streams at 2 hz
-                        var buffer = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM,
-                            new MAVLink.mavlink_request_data_stream_t()
-                            {
-                                req_message_rate = 2,
-                                req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.ALL,
-                                start_stop = 1,
-                                target_component = compid,
-                                target_system = sysid
-                            });
-
-                        serialPort1.Write(buffer, 0, buffer.Length);
-
-                        buffer = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.HEARTBEAT, hb);
-
-                        serialPort1.Write(buffer, 0, buffer.Length);
-                    }
-
-                    //AN PARO THESI TOTE KANO UPDATE TON XARTI
-                    if (packet.msgid == (byte)MAVLink.MAVLINK_MSG_ID.GLOBAL_POSITION_INT)
-                    {
-                        var position = (MAVLink.mavlink_global_position_int_t)packet.data;
-                        UpdateMapPosition(position);
-                    }
-
-                    // from here we should check the the message is addressed to us
-                    if (sysid != packet.sysid || compid != packet.compid)
-                        continue;
-
-                    Console.WriteLine(packet.msgtypename);
-
-                    if (packet.msgid == (byte)MAVLink.MAVLINK_MSG_ID.ATTITUDE)
-                    //or
-                    //if (packet.data.GetType() == typeof(MAVLink.mavlink_attitude_t))
-                    {
-                        var att = (MAVLink.mavlink_attitude_t)packet.data;
-
-                        //Console.WriteLine(att.pitch*57.2958 + " " + att.roll*57.2958);
-                    }
-                }
-                catch
-                {
-                }
-
-                System.Threading.Thread.Sleep(1);
-            }
+            HandleMavlinkMessages(serialPort1.BaseStream);
         }
 
         T readsomedata<T>(byte sysid, byte compid, int timeout = 2000)
@@ -1345,8 +1371,7 @@ namespace IERAX_MissionControl
             return R * c; // Distance in meters
         }
 
-
-
+   
 
 
 
@@ -1488,8 +1513,25 @@ namespace IERAX_MissionControl
             return radians * (180.0 / Math.PI);
         }
 
+        private void txtHDCO2_TextChanged(object sender, EventArgs e)
+        {
 
+        }
 
+        private void BottomPanel_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void txtCO2_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void txtCO2_TextChanged_1(object sender, EventArgs e)
+        {
+
+        }
     }
 
 }

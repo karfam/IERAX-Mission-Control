@@ -106,9 +106,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AisMessage.cs" />
+    <Compile Include="CSVHelper.cs" />
     <Compile Include="GMapMarkerImage.cs" />
     <Compile Include="HistoryMarker.cs" />
     <Compile Include="InterceptMarker.cs" />
+    <Compile Include="MAVLinkData.cs" />
     <Compile Include="MavlinkMessageHandler.cs" />
     <Compile Include="ShipMarker.cs" />
     <Compile Include="GeoUtils.cs" />
@@ -162,6 +164,8 @@
     <Content Include="Resources\Images\Drone Take OFF.png" />
     <Content Include="Resources\Images\DroneHeadingIcon.png" />
     <Content Include="Resources\Images\triangle-outline-256.png" />
+    <None Include="Resources\Screenshot_1.jpg" />
+    <None Include="Resources\istockphoto-1471272845-612x612.jpg" />
     <EmbeddedResource Include="Resources\Images\ieraxlogo.png" />
     <EmbeddedResource Include="Resources\Images\selection.png" />
   </ItemGroup>
