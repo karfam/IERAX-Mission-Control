@@ -64,7 +64,6 @@ namespace IERAX_MissionControl
         private readonly List<MAVLinkData> paramValueBatch = new List<MAVLinkData>(); // For batch storage
         private const int BatchSize = 10; // Adjust batch size as needed
 
-
         private Dictionary<string, AisData> cachedAisData = new Dictionary<string, AisData>();
 
         private CancellationTokenSource cts;
@@ -73,9 +72,16 @@ namespace IERAX_MissionControl
 
         private System.Windows.Forms.Timer flyToShipTimer;
         private ShipMarker targetShipMarker;
+
+        public static ShipMarker GlobalClickedMarker { get; set; } // Global variable for the clicked marker
+        public static float InstantCO2 { get; set; }
+        public static float InstantHDCO2 { get; set; }
+
+       
+        // In Main.cs
+        private CameraForm cameraForm;
+
         private const double EarthRadius = 6378137.0;  // Earth's radius in meters
-
-
 
         public MPIeraxMain()
         {
@@ -317,48 +323,64 @@ namespace IERAX_MissionControl
 
         private void HandleSensorMessage(MAVLink.MAVLinkMessage message)
         {
+            if (message == null || message.data == null)
+            {
+                Console.WriteLine("Warning: Received null MAVLink message or data.");
+                return;
+            }
+
             if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.PARAM_VALUE)
             {
                 var paramValue = (MAVLink.mavlink_param_value_t)message.data;
 
                 // Extract parameter name and value
                 string paramName = ExtractParamName(paramValue.param_id);
+                if (string.IsNullOrEmpty(paramName))
+                {
+                    Console.WriteLine("Warning: Extracted an empty parameter name.");
+                    return;
+                }
+
                 float paramValueFloat = paramValue.param_value;
                 string currentTimestamp = DateTime.Now.ToString("HH:mm:ss");
 
-                // Update maximum PPM values and timestamps
+                // CO2 Handling
                 if (paramName == "CO2")
                 {
+                    InstantCO2 = paramValueFloat;
+
                     if (paramValueFloat > maxCO2)
                     {
                         maxCO2 = paramValueFloat;
                         maxCO2Timestamp = currentTimestamp;
 
-                        // Update the TextBox
-                        UpdateMaxValueTextBox(txtCO2max, maxCO2, maxCO2Timestamp);
+                        if (txtCO2max != null)
+                            UpdateMaxValueTextBox(txtCO2max, maxCO2, maxCO2Timestamp);
                     }
 
-                    // Update real-time CO2 value in txtCO2
-                    UpdateTextBox(txtCO2, paramValueFloat.ToString("F2"));
+                    if (txtCO2 != null)
+                        UpdateTextBox(txtCO2, paramValueFloat.ToString("F2"));
                 }
+                // HDCO2 Handling
                 else if (paramName == "HDCO2")
                 {
+                    InstantHDCO2 = paramValueFloat;
+
                     if (paramValueFloat > maxHDCO2)
                     {
                         maxHDCO2 = paramValueFloat;
                         maxHDCO2Timestamp = currentTimestamp;
 
-                        // Update the TextBox
-                        UpdateMaxValueTextBox(txtHDCO2max, maxHDCO2, maxHDCO2Timestamp);
+                        if (txtHDCO2max != null)
+                            UpdateMaxValueTextBox(txtHDCO2max, maxHDCO2, maxHDCO2Timestamp);
                     }
 
-                    // Update real-time HDCO2 value in txtHDCO2
-                    UpdateTextBox(txtHDCO2, paramValueFloat.ToString("F2"));
+                    if (txtHDCO2 != null)
+                        UpdateTextBox(txtHDCO2, paramValueFloat.ToString("F2"));
                 }
-
-               // Console.WriteLine($"Received: param={paramName}, value={paramValueFloat}, timestamp={currentTimestamp}");
             }
         }
+
 
         // Helper method to update the maximum value TextBox
         private void UpdateMaxValueTextBox(Label textBox, float maxValue, string timestamp)
@@ -712,6 +734,8 @@ namespace IERAX_MissionControl
 
             if (clickedMarker != null)
             {
+
+                GlobalClickedMarker = clickedMarker; //
                 // If the right-click was on a ship marker, add the "Fly to [ShipName]" option
                 contextMenu.Items.Add($"Fly to {clickedMarker.ShipName}", null, (s, e) => FlyToShip(clickedMarker));
 
@@ -723,6 +747,7 @@ namespace IERAX_MissionControl
             }
             else
             {
+                GlobalClickedMarker = null; // Reset the global clickedMarker
                 // Add a menu item for showing the coordinates
                 contextMenu.Items.Add($"Latitude: {point.Lat:F6}, Longitude: {point.Lng:F6}", null);
 
@@ -741,6 +766,7 @@ namespace IERAX_MissionControl
             contextMenu.Show(gMapControl1, location);
         }
 
+       
 
 
 
@@ -1531,6 +1557,25 @@ namespace IERAX_MissionControl
         private void txtCO2_TextChanged_1(object sender, EventArgs e)
         {
 
+        }
+
+        private void button1_Click_1(object sender, EventArgs e)
+        {
+            // Change the port number to the one your drone camera is streaming on.
+            int cameraPort = 5600;
+            CameraForm camForm = new CameraForm(cameraPort);
+            camForm.Show();  // Opens the camera feed in a new window.
+        }
+
+        private void label16_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void analyzerBT_Click(object sender, EventArgs e)
+        {
+            AnalyzerForm analyzer = new AnalyzerForm();
+            analyzer.Show();
         }
     }
 
