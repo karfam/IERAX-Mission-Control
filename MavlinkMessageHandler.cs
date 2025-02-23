@@ -10,18 +10,18 @@ namespace IERAX_MissionControl
 {
     public class MavlinkMessageHandler
     {
-        private readonly Action<PointLatLng> updateDroneMarkerAction;
+        private readonly Action<GMap.NET.PointLatLng> updateDroneMarkerAction;
         private readonly Action<bool> updateArmStatusBoxAction;
         private readonly Action<double> updateAltimeterBoxAction;
         private readonly Action<string> updateDroneModeTextBox;
         private readonly Action<string, string> updateTextLabelGUI;
 
-        public PointLatLng DroneCurrentPosition { get; set; }
+        public GMap.NET.PointLatLng DroneCurrentPosition { get; set; }
         public float DroneGroundSpeed { get; set; }
         public double DroneHeading { get; set; }
 
 
-        public MavlinkMessageHandler(Action<PointLatLng> updateDroneMarkerAction, Action<bool> updateArmStatusBoxAction,
+        public MavlinkMessageHandler(Action<GMap.NET.PointLatLng> updateDroneMarkerAction, Action<bool> updateArmStatusBoxAction,
                                  Action<double> updateAltimeterBoxAction, Action<string> updateDroneModeTextBox,
                                  Action<string, string> updateTextLabelGUI)
         {
@@ -205,7 +205,7 @@ namespace IERAX_MissionControl
             double longitude = positionMessage.lon / 1e7;
             double altitude = positionMessage.relative_alt / 1000.0; // in meters
 
-            PointLatLng position = new PointLatLng(latitude, longitude);
+            GMap.NET.PointLatLng position = new GMap.NET.PointLatLng(latitude, longitude);
             // Update the global variable
             DroneCurrentPosition = position;
 
@@ -217,7 +217,7 @@ namespace IERAX_MissionControl
             // Update the AltimeterBox with the altitude
             updateAltimeterBoxAction(altitude);
 
-            Console.WriteLine($"GLOBAL_POSITION_INT: Lat={latitude}, Lng={longitude}, Alt={altitude}");
+           // Console.WriteLine($"GLOBAL_POSITION_INT: Lat={latitude}, Lng={longitude}, Alt={altitude}");
         }
 
     

@@ -7,13 +7,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
 namespace IERAX_MissionControl
 {
     public class InterceptMarker : GMap.NET.WindowsForms.GMapMarker
     {
         private Bitmap markerIcon;
 
-        public InterceptMarker(PointLatLng p) : base(p)
+        public InterceptMarker(GMap.NET.PointLatLng p) : base(p)
         {
             // Load and resize the icon
             markerIcon = new Bitmap(Resources.triangle_outline_256); // Use your custom icon here

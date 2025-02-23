@@ -20,7 +20,7 @@ namespace IERAX_MissionControl
         private readonly MavlinkMessageHandler mavlinkMessageHandler;
 
         // Modified constructor to accept MavlinkMessageHandler
-        public DroneMarker(PointLatLng p, MavlinkMessageHandler handler) : base(p)
+        public DroneMarker(GMap.NET.PointLatLng p, MavlinkMessageHandler handler) : base(p)
         {
             // Store the reference to the MavlinkMessageHandler instance
             mavlinkMessageHandler = handler;

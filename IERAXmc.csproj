@@ -147,6 +147,13 @@
     <Compile Include="CameraForm.Designer.cs">
       <DependentUpon>CameraForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="DroneMeasurementVisualizer.cs" />
+    <Compile Include="DroneStatusForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DroneStatusForm.Designer.cs">
+      <DependentUpon>DroneStatusForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="GMapMarkerImage.cs" />
     <Compile Include="HistoryMarker.cs" />
     <Compile Include="InterceptMarker.cs" />
@@ -168,6 +175,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="CameraForm.resx">
       <DependentUpon>CameraForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="DroneStatusForm.resx">
+      <DependentUpon>DroneStatusForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

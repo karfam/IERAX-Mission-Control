@@ -81,7 +81,7 @@ namespace IERAX_MissionControl
             }
         }
 
-        public ShipMarker(PointLatLng p) : base(p)
+        public ShipMarker(GMap.NET.PointLatLng p) : base(p)
         {
             Bitmap originalIcon = new Bitmap(Resources.container); // Assuming the image is named ShipMarker in Resources
             shipIcon = ResizeBitmap(originalIcon, 50, 50); // Adjust the size as needed

@@ -29,7 +29,6 @@ using System.IO;
 
 
 
-
 namespace IERAX_MissionControl
 {
     public partial class MPIeraxMain : Form
@@ -43,6 +42,8 @@ namespace IERAX_MissionControl
         // our target compid
         byte compid;
 
+        private DroneStatusForm statusForm;
+
         private GMapOverlay markersOverlay;
         private DroneMarker droneMarker;
         private ShipMarker shipMarker;
@@ -54,6 +55,7 @@ namespace IERAX_MissionControl
         private NetworkStream tcpStream; // Store the TCP stream for the connection
         private UdpClient udpClient;
         private IPEndPoint remoteEndPoint;
+        private bool isConnected = false;
         // Variables to track maximum values and timestamps
         private float maxCO2 = float.MinValue;
         private string maxCO2Timestamp = string.Empty;
@@ -80,7 +82,7 @@ namespace IERAX_MissionControl
        
         // In Main.cs
         private CameraForm cameraForm;
-
+        private Boolean shipFollowingMode = false;
         private const double EarthRadius = 6378137.0;  // Earth's radius in meters
 
         public MPIeraxMain()
@@ -89,6 +91,7 @@ namespace IERAX_MissionControl
             InitializeComponent();
             InitializeMap();
             InitializeWebSocket();
+            this.AutoScaleMode = AutoScaleMode.Dpi;
         }
 
 
@@ -210,62 +213,102 @@ namespace IERAX_MissionControl
 
             try
             {
-                // Check if the selected option is an IP:Port format (indicating a TCP connection)
-                if (selectedConnection.Contains(":"))
+                if (selectedConnection.Contains(":")) // TCP Connection Handling
                 {
-                    // Parse the IP and port
-                    string[] parts = selectedConnection.Split(':');
-                    string ip = parts[0];
-                    int port = int.Parse(parts[1]);
-
-                    // Handle TCP connection
-                    ConnectViaTCP(ip, port);
-                }
-                else
-                {
-                    // Handle serial port connection as before
-
-                    // If the port is open, close it
-                    if (serialPort1.IsOpen)
+                    if (isConnected)
                     {
-                        // If the port is open, close it and update the button
-                        serialPort1.Close();
-                        but_connect.Text = "Connect";
-                        but_connect.BackColor = Color.Gray;
+                        DisconnectTCP();
                     }
                     else
                     {
-                        // Set the comport options
-                        serialPort1.PortName = selectedConnection;
-                        serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+                        string[] parts = selectedConnection.Split(':');
+                        string ip = parts[0];
+                        int port = int.Parse(parts[1]);
 
-                        // Open the comport
-                        serialPort1.Open();
-
-                        // Set timeout to 2 seconds
-                        serialPort1.ReadTimeout = 2000;
-
-                        // Update the button when connected
-                        but_connect.Text = "Disconnect";
-                        but_connect.BackColor = Color.Green;
-
-                        // Start a background worker for handling the connection
-                        BackgroundWorker bgw = new BackgroundWorker();
-                        bgw.DoWork += bgw_DoWork;
-                        bgw.RunWorkerAsync();
+                        ConnectViaTCP(ip, port);
+                    }
+                }
+                else // Serial Port Connection Handling
+                {
+                    if (serialPort1.IsOpen)
+                    {
+                        DisconnectSerial();
+                    }
+                    else
+                    {
+                        ConnectSerial(selectedConnection);
                     }
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error: {ex.Message}", "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                // Reset the button to the default state in case of an error
-                but_connect.Text = "Connect";
-                but_connect.BackColor = Color.Gray;
+                ResetConnectButton(); // Reset button in case of failure
             }
         }
-        
-        private void ConnectViaTCP(string ip, int port)
+
+        // Function to connect via Serial
+        private void ConnectSerial(string portName)
+        {
+            serialPort1.PortName = portName;
+            serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+            serialPort1.Open();
+            serialPort1.ReadTimeout = 2000;
+
+            this.Invoke(new Action(() =>
+            {
+                but_connect.Text = "Disconnect";
+                but_connect.BackColor = Color.Green;
+                but_connect.ForeColor = Color.White;
+            }));
+
+            // Start background worker to handle connection
+            BackgroundWorker bgw = new BackgroundWorker();
+            bgw.DoWork += bgw_DoWork;
+            bgw.RunWorkerAsync();
+        }
+
+        // Function to disconnect Serial
+        private void DisconnectSerial()
+        {
+            serialPort1.Close();
+
+            this.Invoke(new Action(() =>
+            {
+                but_connect.Text = "Connect";
+                but_connect.BackColor = Color.Red;
+                but_connect.ForeColor = Color.White;
+            }));
+        }
+
+        // Function to reset button on failure
+        private void ResetConnectButton()
+        {
+            this.Invoke(new Action(() =>
+            {
+                but_connect.Text = "Connect";
+                but_connect.BackColor = Color.Gray;
+                but_connect.ForeColor = Color.Black;
+                isConnected = false;
+            }));
+        }
+
+        private void DisconnectTCP()
+        {
+            Console.WriteLine("❌ Disconnected from SITL");
+
+            this.Invoke(new Action(() =>
+            {
+                but_connect.Text = "Connect";
+                but_connect.BackColor = Color.Red;
+                but_connect.ForeColor = Color.White;
+                isConnected = false;
+            }));
+        }
+
+
+
+        private async Task ConnectViaTCP(string ip, int port)
         {
             try
             {
@@ -273,16 +316,274 @@ namespace IERAX_MissionControl
                 tcpStream = client.GetStream();
                 isTcpConnection = true;
 
-                Console.WriteLine($"Connected to drone at {ip}:{port}");
+                this.Invoke(new Action(() =>
+                {
+                    but_connect.Text = "Connected";
+                    but_connect.BackColor = Color.Green;
+                    but_connect.ForeColor = Color.White;
+                    isConnected = true;
+                }));
+
+                Console.WriteLine($"✅ Connected to SITL at {ip}:5762");
+
+                // Send heartbeat and wait for SYSID response
+                bool sysIdReceived = await SendMavlinkHeartbeatAsync();
+                if (!sysIdReceived)
+                {
+                    Console.WriteLine("❌ Connection failed: No SYSID received.");
+                    return;
+                }
+                await Task.Delay(1000);
+
+                // Request autopilot capabilities (Wakes up SITL)
+                  //RequestAutopilotCapabilities();
+                 // await Task.Delay(1000);
+
+                // Request system parameters
+              RequestParameters();
+               await Task.Delay(2000);
+
+
+                // Request telemetry data streams
+                RequestDataStream();
+                await Task.Delay(1000);
 
                 // Start handling MAVLink messages
-                Task.Run(() => HandleMavlinkMessages(tcpStream));
+                await Task.Run(() => HandleMavlinkMessages(tcpStream));
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to connect to {ip}:{port} - {ex.Message}");
             }
         }
+
+        private async Task<bool> SendMavlinkHeartbeatAsync()
+        {
+            if (tcpStream == null)
+            {
+                Console.WriteLine("TCP stream is null. Cannot send heartbeat.");
+                return false;
+            }
+
+            try
+            {
+                MAVLink.mavlink_heartbeat_t heartbeat = new MAVLink.mavlink_heartbeat_t()
+                {
+                    type = (byte)MAVLink.MAV_TYPE.GCS,  // Ground Control Station
+                    autopilot = (byte)MAVLink.MAV_AUTOPILOT.INVALID,
+                    base_mode = (byte)MAVLink.MAV_MODE_FLAG.MANUAL_INPUT_ENABLED,
+                    system_status = (byte)MAVLink.MAV_STATE.ACTIVE,
+                    mavlink_version = 3  // Ensure MAVLink 2.0
+                };
+
+                byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.HEARTBEAT, heartbeat);
+
+           
+                    tcpStream.Write(packet, 0, packet.Length);
+                    tcpStream.Flush();
+                    Console.WriteLine($"✅ Sent MAVLink heartbeat over TCP ");
+                await Task.Delay(500);
+
+                // Now wait for a response for up to 2.2 seconds
+                return await WaitForSysIdCompIdAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending heartbeat over TCP: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<bool> WaitForSysIdCompIdAsync()
+        {
+            DateTime timeout = DateTime.Now.AddMilliseconds(2200);
+
+            while (DateTime.Now < timeout)
+            {
+                MAVLink.MAVLinkMessage packet;
+                lock (readlock)
+                {
+                    packet = mavlink.ReadPacket(tcpStream);
+                    if (packet == null || packet.data == null)
+                        continue;
+                }
+
+                // Check if the received packet is a heartbeat
+                if (packet.data.GetType() == typeof(MAVLink.mavlink_heartbeat_t))
+                {
+                    var hb = (MAVLink.mavlink_heartbeat_t)packet.data;
+                    sysid = packet.sysid;
+                    compid = packet.compid;
+
+                    Console.WriteLine($"✅ Received SYSID={sysid}, COMPID={compid}");
+                    return true;
+                }
+
+                await Task.Delay(50); // Small delay to avoid excessive CPU usage
+            }
+
+            Console.WriteLine("❌ Timeout: No SYSID/COMPID received.");
+            return false;
+        }
+
+
+
+
+        private void SendMavlinkHeartbeat()
+        {
+            if (tcpStream == null)
+            {
+                Console.WriteLine("TCP stream is null. Cannot send heartbeat.");
+                return;
+            }
+
+            try
+            {
+                MAVLink.mavlink_heartbeat_t heartbeat = new MAVLink.mavlink_heartbeat_t()
+                {
+                    type = (byte)MAVLink.MAV_TYPE.GCS,  // Ground Control Station
+                    autopilot = (byte)MAVLink.MAV_AUTOPILOT.INVALID,
+                    base_mode = (byte)MAVLink.MAV_MODE_FLAG.MANUAL_INPUT_ENABLED,
+                    system_status = (byte)MAVLink.MAV_STATE.ACTIVE,
+                    mavlink_version = 3
+                };
+
+                byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.HEARTBEAT, heartbeat);
+
+                for (int i = 0; i < 5; i++) // Send 5 times
+                {
+                    tcpStream.Write(packet, 0, packet.Length);
+                    tcpStream.Flush();
+                    Console.WriteLine($"✅ Sent MAVLink heartbeat over TCP (Attempt {i + 1}/5)");
+                    Thread.Sleep(1000);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending heartbeat over TCP: {ex.Message}");
+            }
+        }
+
+
+
+
+        private void RequestDataStream()
+        {
+            if (sysid == 0 || compid == 0)
+            {
+                Console.WriteLine("❌ System ID or Component ID not received yet. Cannot request data.");
+                return;
+            }
+
+            try
+            {
+                byte[][] requests = new byte[][]
+                {
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTENDED_STATUS, req_message_rate = 2, start_stop = 1
+            }),
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.POSITION, req_message_rate = 2, start_stop = 1
+            }),
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA1, req_message_rate = 4, start_stop = 1
+            }),
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA2, req_message_rate = 4, start_stop = 1
+            }),
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA3, req_message_rate = 2, start_stop = 1
+            }),
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.RAW_SENSORS, req_message_rate = 2, start_stop = 1
+            }),
+            mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
+            {
+                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.RC_CHANNELS, req_message_rate = 2, start_stop = 1
+            })
+                };
+
+                foreach (var packet in requests)
+                {
+                    tcpStream.Write(packet, 0, packet.Length);
+                    tcpStream.Flush();
+                    Thread.Sleep(500);
+                }
+
+                Console.WriteLine("📡 Requested multiple data streams from SITL.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error requesting data streams: {ex.Message}");
+            }
+        }
+
+        private void RequestAutopilotCapabilities()
+        {
+            if (sysid == 0 || compid == 0)
+            {
+                Console.WriteLine("❌ System ID or Component ID not received yet. Cannot request capabilities.");
+                return;
+            }
+
+            try
+            {
+                MAVLink.mavlink_command_long_t cmd = new MAVLink.mavlink_command_long_t()
+                {
+                    target_system = sysid,
+                    target_component = compid,
+                    command = (ushort)MAVLink.MAV_CMD.REQUEST_AUTOPILOT_CAPABILITIES
+                };
+
+                byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
+
+                tcpStream.Write(packet, 0, packet.Length);
+                tcpStream.Flush();
+
+                Console.WriteLine("📡 Requested Autopilot Capabilities.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error requesting autopilot capabilities: {ex.Message}");
+            }
+        }
+
+        private void RequestParameters()
+        {
+            if (sysid == 0 || compid == 0)
+            {
+                Console.WriteLine("❌ System ID or Component ID not received yet. Cannot request parameters.");
+                return;
+            }
+
+            try
+            {
+                MAVLink.mavlink_param_request_list_t paramRequest = new MAVLink.mavlink_param_request_list_t()
+                {
+                    target_system = sysid,
+                    target_component = compid
+                };
+
+                byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.PARAM_REQUEST_LIST, paramRequest);
+
+                tcpStream.Write(packet, 0, packet.Length);
+                tcpStream.Flush();
+
+                Console.WriteLine("🔄 Requested SITL parameters.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error requesting parameters: {ex.Message}");
+            }
+        }
+
+
 
 
 
@@ -425,7 +726,7 @@ namespace IERAX_MissionControl
                                       .ToArray());
         }
 
-      
+
 
         private void UpdateDroneMarker(PointLatLng position)
         {
@@ -438,7 +739,7 @@ namespace IERAX_MissionControl
                 if (droneMarker == null)
                 {
                     // Create the drone marker if it doesn't exist
-                    droneMarker = new DroneMarker(position,mavlinkMessageHandler);
+                    droneMarker = new DroneMarker(position, mavlinkMessageHandler);
                     markersOverlay.Markers.Add(droneMarker);
                 }
                 else
@@ -450,8 +751,59 @@ namespace IERAX_MissionControl
                 // Optionally, refresh the overlay to ensure the marker is rendered correctly
                 markersOverlay.IsVisibile = false;
                 markersOverlay.IsVisibile = true;
+
+                // Get the drone's speed
+                double droneSpeedMps = GetDroneGroundSpeed();
+
+                // If speed is greater than 5 m/s, draw a straight green line 1000m ahead
+                if (droneSpeedMps > 5.0)
+                {
+                    DrawProjectedFlightPath(position, droneSpeedMps);
+                }
             }
         }
+
+        private void DrawProjectedFlightPath(PointLatLng currentPosition, double speed)
+        {
+            double projectionDistanceMeters = 3000.0; // 1000 meters ahead
+            double bearing = GetDroneCurrentHeading(); // Function to get the drone's heading in degrees
+
+            // Calculate the new projected position 1000m ahead
+            PointLatLng projectedPosition = GetDestinationPoint(currentPosition, projectionDistanceMeters, bearing);
+
+            // Remove any existing projected path lines before adding a new one
+            markersOverlay.Routes.Clear();
+
+            // Create a new route (polyline) from the current position to the projected position
+            GMapRoute projectedPath = new GMapRoute(new List<PointLatLng> { currentPosition, projectedPosition }, "FlightPath");
+            projectedPath.Stroke = new Pen(Color.Green, 3); // Green line with thickness 3
+
+            // Add the projected path to the overlay
+            markersOverlay.Routes.Add(projectedPath);
+        }
+
+        // Function to calculate the destination point given a starting point, distance, and bearing
+        private PointLatLng GetDestinationPoint(PointLatLng startPoint, double distanceMeters, double bearingDegrees)
+        {
+            double radiusEarth = 6371000.0; // Radius of Earth in meters
+            double latRad = startPoint.Lat * (Math.PI / 180.0);
+            double lonRad = startPoint.Lng * (Math.PI / 180.0);
+            double bearingRad = bearingDegrees * (Math.PI / 180.0);
+
+            double angularDistance = distanceMeters / radiusEarth;
+
+            double newLatRad = Math.Asin(Math.Sin(latRad) * Math.Cos(angularDistance) +
+                                         Math.Cos(latRad) * Math.Sin(angularDistance) * Math.Cos(bearingRad));
+
+            double newLonRad = lonRad + Math.Atan2(Math.Sin(bearingRad) * Math.Sin(angularDistance) * Math.Cos(latRad),
+                                                   Math.Cos(angularDistance) - Math.Sin(latRad) * Math.Sin(newLatRad));
+
+            double newLat = newLatRad * (180.0 / Math.PI);
+            double newLon = newLonRad * (180.0 / Math.PI);
+
+            return new PointLatLng(newLat, newLon);
+        }
+
 
 
 
@@ -553,7 +905,7 @@ namespace IERAX_MissionControl
             var serialPorts = SerialPort.GetPortNames().ToList();
 
             // Add the TCP connection option
-            serialPorts.Add("192.168.3.224:5760");
+            serialPorts.Add("172.23.130.102:5760");
             serialPorts.Add("127.0.0.1:5760");
             serialPorts.Add("127.0.0.1:5762");
 
@@ -1231,9 +1583,13 @@ namespace IERAX_MissionControl
                 PointLatLng latestPosition = targetShipMarker.Position;
 
                 // Command the drone to fly to the ship's latest position
-                FlyToLocation(latestPosition);
-                ShipFollowingModeLabel.Text = $"Following {targetShipMarker.ShipName}";
-                ShipFollowingModeLabel.BackColor = Color.Red; // Set the label background to red
+                if (shipFollowingMode)
+                {
+                    FlyToLocation(latestPosition);
+                    ShipFollowingModeLabel.Text = $"Following {targetShipMarker.ShipName}";
+                    ShipFollowingModeLabel.BackColor = Color.Red; // Set the label background to red
+                }
+          
 
                 Console.WriteLine($"Flying to {targetShipMarker.ShipName} at updated position: Lat {latestPosition.Lat}, Lng {latestPosition.Lng}");
             }
@@ -1247,6 +1603,7 @@ namespace IERAX_MissionControl
             }
             // Update the label to indicate that ship following is disabled
             ShipFollowingModeLabel.Text = "SHIP FOLLOWING DISABLED";
+            shipFollowingMode = disabled;
 
             if (targetShipMarker != null)
             {
@@ -1265,6 +1622,7 @@ namespace IERAX_MissionControl
             // Unsubscribe from previous shipMarker events, if any
             if (targetShipMarker != null)
             {
+                shipFollowingMode = true;
                 targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
                 targetShipMarker.SpeedChanged -= OnShipMarkerUpdated;
                 targetShipMarker.HeadingChanged -= OnShipMarkerUpdated;
@@ -1296,6 +1654,7 @@ namespace IERAX_MissionControl
         private void UpdateInterceptPosition()
         {
             double droneSpeedMps = GetDroneGroundSpeed();
+            droneSpeedMps = (droneSpeedMps < 5.0) ? 10.0 : droneSpeedMps;
             double shipSpeedMps = targetShipMarker.Speed * 0.514444;
             double droneHeadingDegrees = GetDroneCurrentHeading();
 
@@ -1333,9 +1692,14 @@ namespace IERAX_MissionControl
             InterceptMarker interceptMarker = new InterceptMarker(interceptPosition);
             markersOverlay.Markers.Add(interceptMarker);
 
-            FlyToLocation(interceptPosition);
+            if (shipFollowingMode)
+            {
+                FlyToLocation(interceptPosition);
 
-            Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
+                Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
+            }
+
+           
 
             // Refresh the overlay
             gMapControl1.Refresh();
@@ -1576,6 +1940,122 @@ namespace IERAX_MissionControl
         {
             AnalyzerForm analyzer = new AnalyzerForm();
             analyzer.Show();
+        }
+
+
+        private async void StartShipMeasurementPattern()
+        {
+            if (droneMarker == null || targetShipMarker == null)
+            {
+                MessageBox.Show("Drone or ship marker is not available.");
+                return;
+            }
+
+            // Open the status window
+            statusForm = new DroneStatusForm();
+            statusForm.Show();
+
+            statusForm.UpdateStatus("Starting Measurement Pattern...");
+
+            // Take the current drone position as the ship's center
+            PointLatLng shipCenter = droneMarker.Position;
+            double shipHeading = targetShipMarker.Heading; // Ship's heading
+
+            // Define movement distance
+            double moveDistance = 100.0; // 100 meters
+            int waitTimeMs = 60000; // 60 seconds
+
+            // Define measurement points
+            List<PointLatLng> measurementPoints = new List<PointLatLng>
+    {
+        GetDestinationPoint(shipCenter, moveDistance, shipHeading),         // Front of the ship
+        GetDestinationPoint(shipCenter, moveDistance, shipHeading - 90),    // Left of the ship
+        GetDestinationPoint(shipCenter, moveDistance, shipHeading + 180),   // Back of the ship
+        GetDestinationPoint(shipCenter, moveDistance, shipHeading + 90)     // Right of the ship
+    };
+
+            int pointIndex = 1;
+            foreach (var point in measurementPoints)
+            {
+                statusForm.UpdateStatus($"Proceeding to point {pointIndex} with heading {shipHeading}°...");
+                FlyToLocation(point); // Move to target position
+                await WaitForDroneToReach(point); // Wait until the drone reaches the point
+                statusForm.UpdateStatus($"Arrived at point {pointIndex}, waiting {waitTimeMs / 1000} seconds...");
+
+                SetLoiterMode(); // Activate Loiter mode to hold position
+
+                // Countdown Timer
+                for (int i = waitTimeMs / 1000; i > 0; i--)
+                {
+                    statusForm.UpdateStatus($"Waiting... {i} sec remaining.");
+                    await Task.Delay(1000);
+                }
+
+                pointIndex++;
+            }
+
+            statusForm.UpdateStatus("Ship measurement pattern completed.");
+            MessageBox.Show("Measurement pattern completed.");
+        }
+
+        // Function to switch to Loiter mode
+        private void SetLoiterMode()
+        {
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+
+            req.target_system = 1; // Drone system ID
+            req.target_component = 1; // Drone component ID
+
+            req.command = (ushort)MAVLink.MAV_CMD.DO_SET_MODE; // Command to set flight mode
+            req.param1 = 1; // Base mode (Auto)
+            req.param2 = 3; // Custom mode: Loiter (3)
+
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+            SendPacket(packet);
+            System.Threading.Thread.Sleep(100);
+        }
+
+        // Function to wait until the drone reaches the target point (optional)
+        private async Task WaitForDroneToReach(PointLatLng targetPoint)
+        {
+            double threshold = 5.0; // 5 meters tolerance
+
+            while (true)
+            {
+                PointLatLng currentPos = droneMarker.Position; // Get drone's current position
+                double distance = GetDistanceBetweenPoints(currentPos, targetPoint);
+
+                if (distance <= threshold)
+                    break; // Drone reached the target
+
+                statusForm.UpdateStatus($"Moving... {distance:F2} meters remaining.");
+                await Task.Delay(1000); // Wait 1 second before checking again
+            }
+        }
+
+        // Function to calculate the distance between two points (Haversine Formula approximation)
+        private double GetDistanceBetweenPoints(PointLatLng p1, PointLatLng p2)
+        {
+            double lat1 = p1.Lat * (Math.PI / 180.0);
+            double lon1 = p1.Lng * (Math.PI / 180.0);
+            double lat2 = p2.Lat * (Math.PI / 180.0);
+            double lon2 = p2.Lng * (Math.PI / 180.0);
+
+            double dlat = lat2 - lat1;
+            double dlon = lon2 - lon1;
+
+            double a = Math.Pow(Math.Sin(dlat / 2), 2) +
+                       Math.Cos(lat1) * Math.Cos(lat2) * Math.Pow(Math.Sin(dlon / 2), 2);
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+            double earthRadius = 6371000.0; // meters
+            return earthRadius * c;
+        }
+
+        private void button1_Click_2(object sender, EventArgs e)
+        {
+            StartShipMeasurementPattern();
+            shipFollowingMode = false;
         }
     }
 
