@@ -3,7 +3,6 @@ using GMap.NET;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.Drawing;
 using System.IO.Ports;
 using System.Linq;
@@ -11,16 +10,12 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GMap.NET.WindowsForms;
-using GMap.NET.WindowsForms.Markers;
 using System.Net.WebSockets;
 using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using IERAX_MissionControl;
-using static GMap.NET.Entity.OpenStreetMapGraphHopperRouteEntity;
 using IERAX_MissionControl.Properties;
 using System.Net.Sockets;
-using System.Data.Entity.Core.Metadata.Edm;
 using System.Net;
 using static MAVLink;
 using System.IO;
@@ -85,6 +80,9 @@ namespace IERAX_MissionControl
         private Boolean shipFollowingMode = false;
         private const double EarthRadius = 6378137.0;  // Earth's radius in meters
 
+        private System.Windows.Forms.Timer droneNavigationTimer;
+        private DroneFlightMode currentMode = DroneFlightMode.None;
+
         public MPIeraxMain()
         {
             InitializeMavlinkHandler();
@@ -92,8 +90,19 @@ namespace IERAX_MissionControl
             InitializeMap();
             InitializeWebSocket();
             this.AutoScaleMode = AutoScaleMode.Dpi;
+
+            // Initialize the timer
+            droneNavigationTimer = new System.Windows.Forms.Timer();
+            droneNavigationTimer.Interval = 1000; // 1 second
+            droneNavigationTimer.Tick += DroneNavigationTimer_Tick;
         }
 
+        public enum DroneFlightMode
+        {
+            None,
+            Follow,
+            Intercept
+        }
 
         private void gMapControl1_Load(object sender, EventArgs e)
         {
@@ -181,7 +190,7 @@ namespace IERAX_MissionControl
         private void ConfigureMap()
         {
             gMapControl1.MapProvider = GMapProviders.GoogleSatelliteMap;
-            gMapControl1.Position = new PointLatLng(37.7128, 21.0060); // Example coordinates
+            gMapControl1.Position = new PointLatLng(37.7128, 21.0060); 
             gMapControl1.MinZoom = 1;
             gMapControl1.MaxZoom = 20;
             gMapControl1.Zoom = 10;
@@ -1337,7 +1346,7 @@ namespace IERAX_MissionControl
             }
 
             // Load the circle image from resources or file
-            Bitmap circleImage = new Bitmap(Resources.selection); // Replace with your actual image resource or path
+            Bitmap circleImage = new Bitmap(Properties.Resources.selection); // Replace with your actual image resource or path
 
             // Create a new marker using the circle image
             GMapMarker circleMarker = new GMapMarkerImage(marker.Position, circleImage)
@@ -1563,48 +1572,76 @@ namespace IERAX_MissionControl
         {
             // Store the target ship marker
             targetShipMarker = shipMarker;
-
-            // Start a timer to continuously update the drone's target position
-            if (flyToShipTimer == null)
-            {
-                flyToShipTimer = new System.Windows.Forms.Timer();
-                flyToShipTimer.Interval = 1000; // Update every second
-                flyToShipTimer.Tick += FlyToShipTimer_Tick;
-            }
-
-            flyToShipTimer.Start();
+            currentMode = DroneFlightMode.Follow;
+            droneNavigationTimer.Start();
         }
 
-        private void FlyToShipTimer_Tick(object sender, EventArgs e)
+        private void DroneNavigationTimer_Tick(object sender, EventArgs e)
         {
-            if (targetShipMarker != null)
+            if (targetShipMarker == null || currentMode == DroneFlightMode.None)
             {
-                // Get the latest position of the ship
-                PointLatLng latestPosition = targetShipMarker.Position;
-
-                // Command the drone to fly to the ship's latest position
-                if (shipFollowingMode)
-                {
-                    FlyToLocation(latestPosition);
-                    ShipFollowingModeLabel.Text = $"Following {targetShipMarker.ShipName}";
-                    ShipFollowingModeLabel.BackColor = Color.Red; // Set the label background to red
-                }
-          
-
-                Console.WriteLine($"Flying to {targetShipMarker.ShipName} at updated position: Lat {latestPosition.Lat}, Lng {latestPosition.Lng}");
+                // No active mode or no ship to target.
+                return;
             }
+
+            // Get the drone’s current position
+            var dronePosition = GetDroneCurrentPosition();
+
+            // Decide what the target point is, based on the mode.
+            PointLatLng targetPoint;
+
+            if (currentMode == DroneFlightMode.Follow)
+            {
+                // The target is the ship’s latest position
+                targetPoint = targetShipMarker.Position;
+            }
+            else if (currentMode == DroneFlightMode.Intercept)
+            {
+                // Compute the intercept position
+                //targetPoint = CalculateIntercept(dronePosition, targetShipMarker);
+                targetPoint = UpdateInterceptPosition();
+            }
+            else
+            {
+                return;
+            }
+
+            // Check distance
+            double distance = GetDistance(dronePosition, targetPoint);
+            // Optional: Update arrival time label
+            double droneSpeedMps = GetDroneGroundSpeed();
+            // if speed < some threshold, assume a default speed to avoid dividing by zero
+            if (droneSpeedMps < 0.5) droneSpeedMps = 0.5;
+
+            // approximate time to arrival
+            double timeToArrival = distance / droneSpeedMps; // in seconds
+                                                             // Update label
+            ShipFollowingModeLabel.Text = $"{currentMode} {targetShipMarker.ShipName} - {timeToArrival:F1}s to arrival";
+
+            // If within 3 meters, stop
+            if (distance <= 3.0)
+            {
+                StopFlight($"Arrived at target within 3m (mode: {currentMode})");
+            }
+            else
+            {
+                // Otherwise, command the drone to fly to the target point
+                FlyToLocation(targetPoint);
+            }
+
+
         }
 
-        private void StopFlyToShip()
+        private void StopFlight(string reason = "")
         {
-            if (flyToShipTimer != null)
-            {
-                flyToShipTimer.Stop();
-            }
-            // Update the label to indicate that ship following is disabled
-            ShipFollowingModeLabel.Text = "SHIP FOLLOWING DISABLED";
-            shipFollowingMode = disabled;
+            droneNavigationTimer.Stop();
+            currentMode = DroneFlightMode.None;
 
+            ShipFollowingModeLabel.Text = $"Stopped: {reason}";
+            ShipFollowingModeLabel.BackColor = Color.Green;
+
+            shipFollowingMode = false; // if you still rely on this flag
+                                       // Unsubscribe from events, if necessary
             if (targetShipMarker != null)
             {
                 targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
@@ -1612,13 +1649,12 @@ namespace IERAX_MissionControl
                 targetShipMarker.HeadingChanged -= OnShipMarkerUpdated;
             }
 
-            ShipFollowingModeLabel.BackColor = Color.Green; // Set the label background to green
-            targetShipMarker = null;
         }
 
         private void InterceptShip(ShipMarker shipMarker)
 
         {
+
             // Unsubscribe from previous shipMarker events, if any
             if (targetShipMarker != null)
             {
@@ -1630,6 +1666,7 @@ namespace IERAX_MissionControl
 
             // Store the target ship marker
             targetShipMarker = shipMarker;
+            currentMode = DroneFlightMode.Intercept;
 
             // Subscribe to the shipMarker events
             targetShipMarker.PositionChanged += OnShipMarkerUpdated;
@@ -1641,6 +1678,7 @@ namespace IERAX_MissionControl
             ShipFollowingModeLabel.BackColor = Color.Red;
 
             // Calculate the initial intercept position
+            droneNavigationTimer.Start();
             UpdateInterceptPosition();
         }
 
@@ -1651,37 +1689,43 @@ namespace IERAX_MissionControl
         }
 
         // Method to update the intercept position
-        private void UpdateInterceptPosition()
+        private PointLatLng UpdateInterceptPosition()
         {
             double droneSpeedMps = GetDroneGroundSpeed();
+            // Ensure a minimum drone speed for calculation purposes
             droneSpeedMps = (droneSpeedMps < 5.0) ? 10.0 : droneSpeedMps;
-            double shipSpeedMps = targetShipMarker.Speed * 0.514444;
+            double shipSpeedMps = targetShipMarker.Speed * 0.514444; // Convert knots to m/s if needed
             double droneHeadingDegrees = GetDroneCurrentHeading();
 
             var dronePosition = GetDroneCurrentPosition();
             double distanceToShip = GetDistance(dronePosition, targetShipMarker.Position);
             double timeToIntercept = distanceToShip / droneSpeedMps;
 
+            // Calculate intercept position based on ship's current position and heading
             PointLatLng interceptPosition = CalculateInterceptPosition(targetShipMarker.Position, targetShipMarker.Heading, shipSpeedMps, timeToIntercept);
 
+            // Optionally, compute a refined intercept position using your other method:
             PointLatLng interceptLatLng = CalculateIntercept(
-           dronePosition, droneSpeedMps, droneHeadingDegrees,
-           targetShipMarker.Position, targetShipMarker.Speed, targetShipMarker.Heading
-       );
+                dronePosition, droneSpeedMps, droneHeadingDegrees,
+                targetShipMarker.Position, targetShipMarker.Speed, targetShipMarker.Heading
+            );
 
             Console.WriteLine($"Intercept Coordinates: Latitude {interceptLatLng.Lat:F6}, Longitude {interceptLatLng.Lng:F6}");
 
-            // Add or update the intercept marker
-
+            // Update the intercept marker on the map using the intercept position.
             AddInterceptMarker(interceptPosition);
+
+            // Return the intercept position as the target point for intercept
+            return interceptPosition;
         }
+
 
         private void AddInterceptMarker(PointLatLng interceptPosition)
         {
             // Remove the previous intercept marker if it exists
             var existingInterceptMarkers = markersOverlay.Markers
                 .Where(m => m is InterceptMarker)
-                .ToList(); // ToList() is important to avoid modifying the collection while iterating
+                .ToList();
 
             foreach (var marker in existingInterceptMarkers)
             {
@@ -1692,16 +1736,32 @@ namespace IERAX_MissionControl
             InterceptMarker interceptMarker = new InterceptMarker(interceptPosition);
             markersOverlay.Markers.Add(interceptMarker);
 
-            if (shipFollowingMode)
-            {
-                FlyToLocation(interceptPosition);
+            // Check the distance between the drone and the intercept position.
+            var dronePosition = GetDroneCurrentPosition();
+            double distanceToIntercept = GetDistance(dronePosition, interceptPosition);
 
+            // If the drone is within 3 meters, stop intercepting.
+            if (distanceToIntercept <= 3)
+            {
+                shipFollowingMode = false;
+                // Unsubscribe from ship marker events:
+                targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
+                targetShipMarker.SpeedChanged -= OnShipMarkerUpdated;
+                targetShipMarker.HeadingChanged -= OnShipMarkerUpdated;
+
+                ShipFollowingModeLabel.Text = $"Intercept complete";
+                ShipFollowingModeLabel.BackColor = Color.Green;
+
+                Console.WriteLine("Intercept complete: Drone is within 3 meters of the intercept point.");
+            }
+            else if (shipFollowingMode)
+            {
+                // Command the drone to fly to the intercept point if not yet within 3 meters.
+                FlyToLocation(interceptPosition);
                 Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
             }
 
-           
-
-            // Refresh the overlay
+            // Refresh the overlay.
             gMapControl1.Refresh();
         }
 
@@ -1767,9 +1827,9 @@ namespace IERAX_MissionControl
 
         private void StopFollowingShipButton_Click(object sender, EventArgs e)
         {
-            StopFlyToShip();
+            StopFlight("User requested stop following ship");
 
-                if (targetShipMarker != null)
+            if (targetShipMarker != null)
             {
                 targetShipMarker.PositionChanged -= OnShipMarkerUpdated;
                 targetShipMarker.SpeedChanged -= OnShipMarkerUpdated;
@@ -1943,6 +2003,23 @@ namespace IERAX_MissionControl
         }
 
 
+
+        public static PointLatLng ConvertOffsetToLatLng(PointLatLng origin, double offsetX, double offsetY)
+        {
+            // Earth's radius in meters (WGS84 standard)
+            double earthRadius = 6378137;
+
+            // Calculate the change in latitude in degrees
+            double deltaLat = (offsetY / earthRadius) * (180 / Math.PI);
+
+            // Calculate the change in longitude in degrees (adjusted for current latitude)
+            double deltaLng = (offsetX / earthRadius) * (180 / Math.PI) / Math.Cos(origin.Lat * Math.PI / 180);
+
+            // Return the new geographic coordinate
+            return new PointLatLng(origin.Lat + deltaLat, origin.Lng + deltaLng);
+        }
+
+
         private async void StartShipMeasurementPattern()
         {
             if (droneMarker == null || targetShipMarker == null)
@@ -1958,41 +2035,84 @@ namespace IERAX_MissionControl
             statusForm.UpdateStatus("Starting Measurement Pattern...");
 
             // Take the current drone position as the ship's center
-            PointLatLng shipCenter = droneMarker.Position;
+            PointLatLng shipPosition = droneMarker.Position;
             double shipHeading = targetShipMarker.Heading; // Ship's heading
 
-            // Define movement distance
-            double moveDistance = 100.0; // 100 meters
-            int waitTimeMs = 60000; // 60 seconds
+            DroneMeasurementVisualizer visualizer = new DroneMeasurementVisualizer();
 
-            // Define measurement points
-            List<PointLatLng> measurementPoints = new List<PointLatLng>
-    {
-        GetDestinationPoint(shipCenter, moveDistance, shipHeading),         // Front of the ship
-        GetDestinationPoint(shipCenter, moveDistance, shipHeading - 90),    // Left of the ship
-        GetDestinationPoint(shipCenter, moveDistance, shipHeading + 180),   // Back of the ship
-        GetDestinationPoint(shipCenter, moveDistance, shipHeading + 90)     // Right of the ship
-    };
+            // Define grid dimensions:
+            // Overall area: 25 meters left, 25 meters right (50m width) and 20 meters front, 30 meters behind (50m height).
+            // We'll split this 50x50 meter area into a 5x5 grid with 10x10 meter cells.
 
+            // Pre-calculate the centers for each column (x offsets in meters relative to ship position)
+            // These values center each cell horizontally: -20, -10, 0, 10, 20.
+            double[] colCenters = new double[] { -20, -10, 0, 10, 20 };
+
+            // Pre-calculate the centers for each row (y offsets in meters relative to ship position)
+            // The overall y range is from -30 (back) to +20 (front), so row centers (top to bottom) become: 15, 5, -5, -15, -25.
+            double[] rowCenters = new double[] { 15, 5, -5, -15, -25 };
+
+            // Dictionary to store CO2 readings with the target position as key.
+            Dictionary<PointLatLng, float> co2Readings = new Dictionary<PointLatLng, float>();
             int pointIndex = 1;
-            foreach (var point in measurementPoints)
+
+            // New ordering: iterate row-first in a snake pattern.
+            // First, create a list to hold your grid points (in snake pattern order).
+            List<PointLatLng> gridPoints = new List<PointLatLng>();
+
+            // Precompute the grid points using the snake pattern.
+            for (int row = 0; row < rowCenters.Length; row++)
             {
-                statusForm.UpdateStatus($"Proceeding to point {pointIndex} with heading {shipHeading}°...");
-                FlyToLocation(point); // Move to target position
-                await WaitForDroneToReach(point); // Wait until the drone reaches the point
-                statusForm.UpdateStatus($"Arrived at point {pointIndex}, waiting {waitTimeMs / 1000} seconds...");
-
-                SetLoiterMode(); // Activate Loiter mode to hold position
-
-                // Countdown Timer
-                for (int i = waitTimeMs / 1000; i > 0; i--)
+                if (row % 2 == 0)
                 {
-                    statusForm.UpdateStatus($"Waiting... {i} sec remaining.");
-                    await Task.Delay(1000);
+                    // Even row: left-to-right.
+                    for (int col = 0; col < colCenters.Length; col++)
+                    {
+                        double offsetX = colCenters[col];
+                        double offsetY = rowCenters[row];
+                        PointLatLng targetPoint = ConvertOffsetToLatLng(shipPosition, offsetX, offsetY);
+                        gridPoints.Add(targetPoint);
+                    }
                 }
+                else
+                {
+                    // Odd row: right-to-left.
+                    for (int col = colCenters.Length - 1; col >= 0; col--)
+                    {
+                        double offsetX = colCenters[col];
+                        double offsetY = rowCenters[row];
+                        PointLatLng targetPoint = ConvertOffsetToLatLng(shipPosition, offsetX, offsetY);
+                        gridPoints.Add(targetPoint);
+                    }
+                }
+            }
+
+         
+            foreach (PointLatLng targetPoint in gridPoints)
+            {
+                statusForm.UpdateStatus($"Proceeding to point {pointIndex}");
+
+                // Command the drone to fly to the target point.
+                FlyToLocation(targetPoint);
+
+                // Wait 5 seconds for the drone to reach the destination and for the CO2 sensor to stabilize.
+                await Task.Delay(5000);
+
+                // Read the CO2 sensor value.
+                float currentCO2 = InstantCO2;
+
+                // Save the reading associated with the target point.
+                co2Readings.Add(targetPoint, currentCO2);
+
+                // Update the PictureBox with the latest readings.
+                visualizer.VisualizeCO2Readings(shipPosition, co2Readings, statusForm.VisualizerPictureBox);
 
                 pointIndex++;
             }
+
+
+            // Call the visualization function, passing the ship's position, CO2 readings, and the PictureBox.
+
 
             statusForm.UpdateStatus("Ship measurement pattern completed.");
             MessageBox.Show("Measurement pattern completed.");
@@ -2056,6 +2176,11 @@ namespace IERAX_MissionControl
         {
             StartShipMeasurementPattern();
             shipFollowingMode = false;
+        }
+
+        private void pictureBox4_Click(object sender, EventArgs e)
+        {
+
         }
     }
 

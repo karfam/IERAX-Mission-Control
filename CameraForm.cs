@@ -18,7 +18,7 @@ namespace IERAX_MissionControl
         private volatile bool running;
         private int listenPort;
         private byte[] buffer = new byte[0]; // Buffer for reassembling images
-        private PointLatLng shipPosition=null;
+        private PointLatLng shipPosition;
 
 
 
@@ -223,7 +223,7 @@ namespace IERAX_MissionControl
         /// <summary>
         /// Saves the current image from the PictureBox with a timestamped filename.
         /// </summary>
-        private void SaveScreenshot(GMap.NET.PointLatLng shipPosition, string shipName, string mmsi, double speed, double heading, float instantCO2, float instantHDCO2, string instantAnalyzer)
+        private void SaveScreenshot(PointLatLng shipPosition, string shipName, string mmsi, double speed, double heading, float instantCO2, float instantHDCO2, string instantAnalyzer)
         {
             if (pictureBox.Image == null)
             {

@@ -1,19 +1,14 @@
-﻿using GMap.NET;
-using GMap.NET.WindowsForms;
-using GMap.NET.WindowsForms.Markers;
-using IERAX_MissionControl.Properties;
-using System.Diagnostics;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
-using System.Reflection;
+using System.Drawing.Drawing2D;
+using GMap.NET;
+using GMap.NET.WindowsForms;
+using IERAX_MissionControl.Properties;
+
 
 namespace IERAX_MissionControl
 {
-    using GMap.NET;
-    using GMap.NET.WindowsForms;
-    using System.Drawing;
-    using System.Drawing.Drawing2D;
-    using System.Collections.Generic;
-    using System;
 
     public class ShipMarker : GMapMarker
     {
@@ -67,8 +62,8 @@ namespace IERAX_MissionControl
         public PointLatLng? PreviousPosition { get; set; }
 
         // Property to store the previous position
-        private PointLatLng? shipPosition;
-        public PointLatLng? ShipPosition
+        private PointLatLng shipPosition;
+        public PointLatLng ShipPosition
         {
             get => shipPosition;
             set
@@ -81,9 +76,9 @@ namespace IERAX_MissionControl
             }
         }
 
-        public ShipMarker(GMap.NET.PointLatLng p) : base(p)
+        public ShipMarker(PointLatLng p) : base(p)
         {
-            Bitmap originalIcon = new Bitmap(Resources.container); // Assuming the image is named ShipMarker in Resources
+            Bitmap originalIcon = new Bitmap(Properties.Resources.container); // Assuming the image is named ShipMarker in Resources
             shipIcon = ResizeBitmap(originalIcon, 50, 50); // Adjust the size as needed
         }
 

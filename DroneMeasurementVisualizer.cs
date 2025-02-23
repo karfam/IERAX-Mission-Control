@@ -1,14 +1,14 @@
 ﻿
-
-
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using GMap.NET;
 
 namespace IERAX_MissionControl
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Drawing;
-    using System.Linq;
-    using System.Windows.Forms;
+  
 
 
 
@@ -16,12 +16,12 @@ namespace IERAX_MissionControl
     {
         // Visualizes CO2 readings by drawing a grid representation in the provided PictureBox.
         // The shipPosition is used as a reference for generating the ordered grid points.
-        public void VisualizeCO2Readings(PointLatLng shipPosition, Dictionary<PointLatLng, int> co2Readings, PictureBox pictureBox1)
+        public void VisualizeCO2Readings(PointLatLng shipPosition, Dictionary<PointLatLng, float> co2Readings, PictureBox pictureBox1)
         {
             // Grid dimensions: 5 columns x 5 rows
             int gridCols = 5;
             int gridRows = 5;
-            int cellSize = 50; // pixels per cell
+            int cellSize = 100; // pixels per cell
             int imageWidth = gridCols * cellSize;
             int imageHeight = gridRows * cellSize;
 
@@ -52,8 +52,8 @@ namespace IERAX_MissionControl
                 List<PointLatLng> gridPoints = GetOrderedGridPoints(shipPosition);
 
                 // Determine the range of CO2 values for color scaling.
-                int minCO2 = co2Readings.Values.Min();
-                int maxCO2 = co2Readings.Values.Max();
+                float minCO2 = co2Readings.Values.Min();
+                float maxCO2 = co2Readings.Values.Max();
 
                 // Draw each cell in the grid with the corresponding CO2 reading.
                 for (int i = 0; i < gridPoints.Count; i++)
@@ -62,24 +62,36 @@ namespace IERAX_MissionControl
                     int col = i / gridRows;  // Outer loop is columns.
                     int row = i % gridRows;  // Inner loop is rows.
 
-                    // Retrieve the CO2 reading for this grid point.
-                    int reading = co2Readings[gridPoints[i]];
 
-                    // Get the cell color based on the reading (green for low, red for high).
-                    Color cellColor = GetColorForReading(reading, minCO2, maxCO2);
 
-                    // Fill the cell with the determined color.
-                    using (SolidBrush brush = new SolidBrush(cellColor))
+                    // Only process if the key is in the dictionary
+                    if (co2Readings.ContainsKey(gridPoints[i]))
                     {
-                        g.FillRectangle(brush, col * cellSize, row * cellSize, cellSize, cellSize);
+                        float reading = co2Readings[gridPoints[i]];
+                        // Get the cell color based on the reading (green for low, red for high).
+                        Color cellColor = GetColorForReading(reading, minCO2, maxCO2);
+
+                        // Fill the cell with the determined color.
+                        using (SolidBrush brush = new SolidBrush(cellColor))
+                        {
+                            g.FillRectangle(brush, col * cellSize, row * cellSize, cellSize, cellSize);
+                        }
+
+                        // Draw the CO2 reading text in the center of the cell.
+                        string readingText = reading.ToString();
+                        SizeF textSize = g.MeasureString(readingText, SystemFonts.DefaultFont);
+                        float textX = col * cellSize + (cellSize - textSize.Width) / 2;
+                        float textY = row * cellSize + (cellSize - textSize.Height) / 2;
+                        g.DrawString(readingText, SystemFonts.DefaultFont, Brushes.Black, textX, textY);
+                    }
+                    else
+                    {
+                        // Optionally set a default or skip
+                        // e.g. float reading = 0f;
                     }
 
-                    // Draw the CO2 reading text in the center of the cell.
-                    string readingText = reading.ToString();
-                    SizeF textSize = g.MeasureString(readingText, SystemFonts.DefaultFont);
-                    float textX = col * cellSize + (cellSize - textSize.Width) / 2;
-                    float textY = row * cellSize + (cellSize - textSize.Height) / 2;
-                    g.DrawString(readingText, SystemFonts.DefaultFont, Brushes.Black, textX, textY);
+
+                  
                 }
             }
 
@@ -129,30 +141,18 @@ namespace IERAX_MissionControl
         }
 
         // Helper: Maps a CO2 reading to a color gradient (green for low, red for high).
-        private Color GetColorForReading(int reading, int minReading, int maxReading)
+        private Color GetColorForReading(float reading, float minReading, float maxReading)
         {
-            double ratio = (maxReading - minReading) != 0
-                ? (double)(reading - minReading) / (maxReading - minReading)
-                : 0.5;
+            float ratio = (maxReading - minReading) != 0
+                ? (reading - minReading) / (maxReading - minReading)
+                : 0.5f;
 
             int red = (int)(ratio * 255);
             int green = (int)((1 - ratio) * 255);
 
             return Color.FromArgb(red, green, 0);
         }
-    }
 
-    // Example class representing a geographic coordinate.
-    public class PointLatLng
-    {
-        public double Lat { get; set; }
-        public double Lng { get; set; }
-
-        public PointLatLng(double lat, double lng)
-        {
-            Lat = lat;
-            Lng = lng;
-        }
     }
 
 }

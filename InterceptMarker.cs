@@ -14,10 +14,10 @@ namespace IERAX_MissionControl
     {
         private Bitmap markerIcon;
 
-        public InterceptMarker(GMap.NET.PointLatLng p) : base(p)
+        public InterceptMarker(PointLatLng p) : base(p)
         {
             // Load and resize the icon
-            markerIcon = new Bitmap(Resources.triangle_outline_256); // Use your custom icon here
+            markerIcon = new Bitmap(Properties.Resources.triangle_outline_256); // Use your custom icon here
             markerIcon = ResizeBitmap(markerIcon, 50, 50); // Adjust the size as needed
         
         }

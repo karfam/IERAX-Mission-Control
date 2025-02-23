@@ -1,13 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
+
 
 namespace IERAX_MissionControl
 {
@@ -23,6 +17,7 @@ namespace IERAX_MissionControl
             textBoxStatus.Multiline = true;
             textBoxStatus.ScrollBars = ScrollBars.Vertical;
             textBoxStatus.ReadOnly = true;
+            pictureBox1.Paint += PictureBox1_Paint;
         }
 
         // Function to update status text
@@ -38,6 +33,52 @@ namespace IERAX_MissionControl
                 textBoxStatus.SelectionStart = textBoxStatus.Text.Length;
                 textBoxStatus.ScrollToCaret();
             }
+        }
+
+        private void pictureBox1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+     
+
+// Then, implement the event handler:
+        private void PictureBox1_Paint(object sender, PaintEventArgs e)
+        {
+ 
+            // Load the ship layout image (consider caching this image instead of loading on every paint)
+            using (Image shipImage = Properties.Resources.container)
+            {
+                shipImage.RotateFlip(RotateFlipType.Rotate90FlipNone);
+                // Define desired size for the ship layout (change these values as needed)
+                int desiredWidth = 100;  // e.g., 100 pixels wide
+                int desiredHeight = 100; // e.g., 100 pixels tall
+
+                // Calculate the position to center the image in the PictureBox
+                int x = (pictureBox1.Width - desiredWidth) / 2;
+                int y = (pictureBox1.Height - desiredHeight) / 2;
+
+                // Create a destination rectangle
+                Rectangle destRect = new Rectangle(x, y, desiredWidth, desiredHeight);
+
+                // Draw the image
+                e.Graphics.DrawImage(shipImage, destRect);
+            }
+        }
+
+
+
+
+
+        public PictureBox VisualizerPictureBox
+        {
+            get { return this.pictureBox1; }
+        }
+
+
+        private void textBoxStatus_TextChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

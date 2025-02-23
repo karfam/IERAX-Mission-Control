@@ -4,15 +4,12 @@ using GMap.NET.WindowsForms.Markers;
 using IERAX_MissionControl.Properties;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Reflection;
 
 namespace IERAX_MissionControl
 {
-    using GMap.NET;
-    using GMap.NET.WindowsForms;
-    using System;
-    using System.Drawing;
-    using System.Drawing.Drawing2D;
+
 
     public class DroneMarker : GMapMarker
     {
@@ -20,13 +17,13 @@ namespace IERAX_MissionControl
         private readonly MavlinkMessageHandler mavlinkMessageHandler;
 
         // Modified constructor to accept MavlinkMessageHandler
-        public DroneMarker(GMap.NET.PointLatLng p, MavlinkMessageHandler handler) : base(p)
+        public DroneMarker(PointLatLng p, MavlinkMessageHandler handler) : base(p)
         {
             // Store the reference to the MavlinkMessageHandler instance
             mavlinkMessageHandler = handler;
 
             // Load and resize the drone icon
-            Bitmap originalIcon = new Bitmap(Resources.DroneHeadingIcon);
+            Bitmap originalIcon = new Bitmap(Properties.Resources.DroneHeadingIcon);
             droneIcon = ResizeBitmap(originalIcon, 50, 50); // Adjust the size as needed
         }
 

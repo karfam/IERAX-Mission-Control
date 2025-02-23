@@ -159,6 +159,12 @@
     <Compile Include="InterceptMarker.cs" />
     <Compile Include="MAVLinkData.cs" />
     <Compile Include="MavlinkMessageHandler.cs" />
+    <Compile Include="PointLatLngComparer.cs" />
+    <Compile Include="Resources\Resource1.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resource1.resx</DependentUpon>
+    </Compile>
     <Compile Include="ShipMarker.cs" />
     <Compile Include="GeoUtils.cs" />
     <Compile Include="DroneMarker.cs" />
@@ -193,6 +199,10 @@
       <DependentUpon>main.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Resource1.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resource1.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -213,17 +223,19 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources\Images\droneMarker.png" />
+    <EmbeddedResource Include="Resources\Images\cargoship.png" />
+    <Content Include="Resources\Images\droneMarker.png" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\cargo_ship.png" />
     <Content Include="Resources\Images\container.png" />
     <Content Include="Resources\Images\Drone Take OFF.png" />
-    <Content Include="Resources\Images\DroneHeadingIcon.png" />
+    <EmbeddedResource Include="Resources\Images\DroneHeadingIcon.png" />
     <Content Include="Resources\Images\triangle-outline-256.png" />
     <None Include="Resources\Screenshot_1.jpg" />
     <None Include="Resources\istockphoto-1471272845-612x612.jpg" />
-    <EmbeddedResource Include="Resources\Images\ieraxlogo.png" />
-    <EmbeddedResource Include="Resources\Images\selection.png" />
+    <Content Include="Resources\Images\ieraxlogo.png" />
+    <Content Include="Resources\Images\selection.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="Mavlink\MAVLink.csproj">

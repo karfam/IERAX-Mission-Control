@@ -105,7 +105,7 @@
             this.gMapControl1.HelperLineOption = GMap.NET.WindowsForms.HelperLineOptions.DontShow;
             this.gMapControl1.LevelsKeepInMemory = 5;
             this.gMapControl1.Location = new System.Drawing.Point(0, 94);
-            this.gMapControl1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.gMapControl1.Margin = new System.Windows.Forms.Padding(4);
             this.gMapControl1.MarkersEnabled = true;
             this.gMapControl1.MaxZoom = 2;
             this.gMapControl1.MinZoom = 2;
@@ -129,7 +129,7 @@
             this.AltHoldButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.AltHoldButton.Location = new System.Drawing.Point(302, 48);
+            this.AltHoldButton.Location = new System.Drawing.Point(301, 48);
             this.AltHoldButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.AltHoldButton.Name = "AltHoldButton";
             this.AltHoldButton.Size = new System.Drawing.Size(146, 36);
@@ -143,7 +143,7 @@
             this.GuidedModeButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.GuidedModeButton.Location = new System.Drawing.Point(302, 4);
+            this.GuidedModeButton.Location = new System.Drawing.Point(301, 4);
             this.GuidedModeButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.GuidedModeButton.Name = "GuidedModeButton";
             this.GuidedModeButton.Size = new System.Drawing.Size(146, 36);
@@ -157,8 +157,8 @@
             this.StopFollowingShipButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.StopFollowingShipButton.Location = new System.Drawing.Point(752, 46);
-            this.StopFollowingShipButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.StopFollowingShipButton.Location = new System.Drawing.Point(751, 46);
+            this.StopFollowingShipButton.Margin = new System.Windows.Forms.Padding(2);
             this.StopFollowingShipButton.Name = "StopFollowingShipButton";
             this.StopFollowingShipButton.Size = new System.Drawing.Size(146, 40);
             this.StopFollowingShipButton.TabIndex = 14;
@@ -187,8 +187,8 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.ArmStatusBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.125F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ArmStatusBox.Location = new System.Drawing.Point(452, 46);
-            this.ArmStatusBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.ArmStatusBox.Location = new System.Drawing.Point(451, 46);
+            this.ArmStatusBox.Margin = new System.Windows.Forms.Padding(2);
             this.ArmStatusBox.Name = "ArmStatusBox";
             this.ArmStatusBox.Size = new System.Drawing.Size(146, 27);
             this.ArmStatusBox.TabIndex = 6;
@@ -201,8 +201,8 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.but_armdisarm.BackColor = System.Drawing.Color.Yellow;
-            this.but_armdisarm.Location = new System.Drawing.Point(454, 4);
-            this.but_armdisarm.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.but_armdisarm.Location = new System.Drawing.Point(453, 4);
+            this.but_armdisarm.Margin = new System.Windows.Forms.Padding(4);
             this.but_armdisarm.Name = "but_armdisarm";
             this.but_armdisarm.Size = new System.Drawing.Size(142, 36);
             this.but_armdisarm.TabIndex = 3;
@@ -215,8 +215,8 @@
             this.but_mission.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_mission.Location = new System.Drawing.Point(154, 48);
-            this.but_mission.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.but_mission.Location = new System.Drawing.Point(153, 48);
+            this.but_mission.Margin = new System.Windows.Forms.Padding(4);
             this.but_mission.Name = "but_mission";
             this.but_mission.Size = new System.Drawing.Size(142, 36);
             this.but_mission.TabIndex = 4;
@@ -243,8 +243,8 @@
             this.but_connect.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_connect.Location = new System.Drawing.Point(154, 4);
-            this.but_connect.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.but_connect.Location = new System.Drawing.Point(153, 4);
+            this.but_connect.Margin = new System.Windows.Forms.Padding(4);
             this.but_connect.Name = "but_connect";
             this.but_connect.Size = new System.Drawing.Size(142, 36);
             this.but_connect.TabIndex = 2;
@@ -268,9 +268,9 @@
             "57600",
             "115200"});
             this.cmb_baudrate.Location = new System.Drawing.Point(4, 48);
-            this.cmb_baudrate.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.cmb_baudrate.Margin = new System.Windows.Forms.Padding(4);
             this.cmb_baudrate.Name = "cmb_baudrate";
-            this.cmb_baudrate.Size = new System.Drawing.Size(142, 24);
+            this.cmb_baudrate.Size = new System.Drawing.Size(141, 24);
             this.cmb_baudrate.TabIndex = 1;
             this.cmb_baudrate.SelectedIndexChanged += new System.EventHandler(this.cmb_baudrate_SelectedIndexChanged);
             // 
@@ -281,9 +281,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.CMB_comport.FormattingEnabled = true;
             this.CMB_comport.Location = new System.Drawing.Point(4, 4);
-            this.CMB_comport.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.CMB_comport.Margin = new System.Windows.Forms.Padding(4);
             this.CMB_comport.Name = "CMB_comport";
-            this.CMB_comport.Size = new System.Drawing.Size(142, 24);
+            this.CMB_comport.Size = new System.Drawing.Size(141, 24);
             this.CMB_comport.TabIndex = 0;
             this.CMB_comport.SelectedIndexChanged += new System.EventHandler(this.CMB_comport_SelectedIndexChanged);
             this.CMB_comport.Click += new System.EventHandler(this.CMB_comport_Click);
@@ -300,7 +300,7 @@
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
-            this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 229F));
+            this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 232F));
             this.TopPanel.Controls.Add(this.but_connect, 1, 0);
             this.TopPanel.Controls.Add(this.AltHoldButton, 2, 1);
             this.TopPanel.Controls.Add(this.TakeOffButton, 4, 0);
@@ -337,7 +337,7 @@
             this.TakeOffButton.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.TakeOffButton.Cursor = System.Windows.Forms.Cursors.Default;
             this.TakeOffButton.ImageAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.TakeOffButton.Location = new System.Drawing.Point(602, 4);
+            this.TakeOffButton.Location = new System.Drawing.Point(601, 4);
             this.TakeOffButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.TakeOffButton.Name = "TakeOffButton";
             this.TakeOffButton.RightToLeft = System.Windows.Forms.RightToLeft.No;
@@ -356,7 +356,7 @@
             this.ShipInfoLabel.AutoSize = true;
             this.ShipInfoLabel.BackColor = System.Drawing.SystemColors.InfoText;
             this.ShipInfoLabel.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.ShipInfoLabel.Location = new System.Drawing.Point(902, 0);
+            this.ShipInfoLabel.Location = new System.Drawing.Point(901, 0);
             this.ShipInfoLabel.Margin = new System.Windows.Forms.Padding(2, 0, 0, 0);
             this.ShipInfoLabel.Name = "ShipInfoLabel";
             this.TopPanel.SetRowSpan(this.ShipInfoLabel, 2);
@@ -372,8 +372,8 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.LandButton.BackColor = System.Drawing.Color.Lime;
-            this.LandButton.Location = new System.Drawing.Point(602, 46);
-            this.LandButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.LandButton.Location = new System.Drawing.Point(601, 46);
+            this.LandButton.Margin = new System.Windows.Forms.Padding(2);
             this.LandButton.Name = "LandButton";
             this.LandButton.Size = new System.Drawing.Size(146, 40);
             this.LandButton.TabIndex = 16;
@@ -387,7 +387,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.RTLButton.BackColor = System.Drawing.SystemColors.Highlight;
             this.RTLButton.ForeColor = System.Drawing.SystemColors.ControlLightLight;
-            this.RTLButton.Location = new System.Drawing.Point(752, 4);
+            this.RTLButton.Location = new System.Drawing.Point(751, 4);
             this.RTLButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.RTLButton.Name = "RTLButton";
             this.RTLButton.Size = new System.Drawing.Size(146, 36);
@@ -416,11 +416,11 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.pictureBox2.Image = global::IERAX_MissionControl.Properties.Resources.ieraxlogo;
-            this.pictureBox2.Location = new System.Drawing.Point(1052, 4);
+            this.pictureBox2.Location = new System.Drawing.Point(1051, 4);
             this.pictureBox2.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.pictureBox2.Name = "pictureBox2";
             this.TopPanel.SetRowSpan(this.pictureBox2, 2);
-            this.pictureBox2.Size = new System.Drawing.Size(228, 80);
+            this.pictureBox2.Size = new System.Drawing.Size(229, 80);
             this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pictureBox2.TabIndex = 18;
             this.pictureBox2.TabStop = false;
@@ -984,7 +984,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.analyzerBT.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.analyzerBT.Location = new System.Drawing.Point(726, 29);
-            this.analyzerBT.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.analyzerBT.Margin = new System.Windows.Forms.Padding(2);
             this.analyzerBT.Name = "analyzerBT";
             this.analyzerBT.Size = new System.Drawing.Size(177, 69);
             this.analyzerBT.TabIndex = 31;
@@ -1013,7 +1013,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.button1.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.button1.Location = new System.Drawing.Point(907, 29);
-            this.button1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.button1.Margin = new System.Windows.Forms.Padding(2);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(181, 69);
             this.button1.TabIndex = 33;
@@ -1031,7 +1031,7 @@
             this.Controls.Add(this.TopPanel);
             this.Controls.Add(this.gMapControl1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "MPIeraxMain";
             this.Text = "IERAX MISSION CONTROL";
             this.Load += new System.EventHandler(this.MPIeraxMain_Load);

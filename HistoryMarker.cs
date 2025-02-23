@@ -1,11 +1,7 @@
 ﻿using GMap.NET;
 using GMap.NET.WindowsForms;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace IERAX_MissionControl
 {
@@ -16,6 +12,7 @@ namespace IERAX_MissionControl
         public HistoryMarker(PointLatLng p, Brush brush = null) : base(p)
         {
             _brush = brush ?? Brushes.Red; // Default to red if no brush is provided
+          
         }
 
 
