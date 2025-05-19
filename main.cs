@@ -95,6 +95,9 @@ namespace IERAX_MissionControl
             droneNavigationTimer = new System.Windows.Forms.Timer();
             droneNavigationTimer.Interval = 1000; // 1 second
             droneNavigationTimer.Tick += DroneNavigationTimer_Tick;
+
+            // Wire up the LandButton click event
+            this.LandButton.Click += new System.EventHandler(this.LandButton_Click);
         }
 
         public enum DroneFlightMode
@@ -1114,7 +1117,7 @@ namespace IERAX_MissionControl
 
                 // Add "Fly to this location" item
                 ToolStripMenuItem flyToMenuItem = new ToolStripMenuItem("Fly to this location");
-                flyToMenuItem.Click += (sender, e) => FlyToLocation(point);
+                flyToMenuItem.Click += (sender, e) => FlyToLocation(point,25);
                 contextMenu.Items.Add(flyToMenuItem);
 
                 // Add "Land at this location" item
@@ -1131,7 +1134,7 @@ namespace IERAX_MissionControl
 
 
 
-        private void FlyToLocation(PointLatLng point)
+        private void FlyToLocation(PointLatLng point, int altimeter)
 
         {
             // Ensure the drone is in Guided mode
@@ -1140,22 +1143,35 @@ namespace IERAX_MissionControl
             // Convert latitude and longitude from double to int format required by FlyToWaypoint
             int lat_int = (int)(point.Lat * 1e7);
             int lon_int = (int)(point.Lng * 1e7);
-            int alt_int = 50; // Set your desired altitude here (in centimeters)
 
             // Call the method to send the drone to the specified waypoint
-            FlyToWaypoint(lat_int, lon_int, alt_int);
+            FlyToWaypoint(lat_int, lon_int, altimeter);
         }
 
 
 
 
-        private void LandAtLocation(PointLatLng point)
+        private async void LandAtLocation(PointLatLng point)
         {
-            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+            // Step 1: Fly to the specified location at a safe altitude (e.g., 10m or current altitude)
+            int approachAltitude = 10; // You can adjust this value or make it a parameter
+            FlyToLocation(point, approachAltitude);
 
+            // Step 2: Wait until the drone is within 3 meters of the target point
+            double threshold = 3.0; // meters
+            while (true)
+            {
+                PointLatLng currentPos = GetDroneCurrentPosition();
+                double distance = GetDistance(currentPos, point);
+                if (distance <= threshold)
+                    break;
+                await Task.Delay(1000); // Wait 1 second before checking again
+            }
+
+            // Step 3: Send the LAND command at the current location
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
             req.target_system = 1; // Set to your drone's system ID
             req.target_component = 1; // Set to your drone's component ID
-
             req.command = (ushort)MAVLink.MAV_CMD.LAND; // Command to land at a specific location
             req.param5 = (float)point.Lat; // Latitude
             req.param6 = (float)point.Lng; // Longitude
@@ -1584,7 +1600,7 @@ namespace IERAX_MissionControl
                 return;
             }
 
-            // Get the drone’s current position
+            // Get the drone's current position
             var dronePosition = GetDroneCurrentPosition();
 
             // Decide what the target point is, based on the mode.
@@ -1592,7 +1608,7 @@ namespace IERAX_MissionControl
 
             if (currentMode == DroneFlightMode.Follow)
             {
-                // The target is the ship’s latest position
+                // The target is the ship's latest position
                 targetPoint = targetShipMarker.Position;
             }
             else if (currentMode == DroneFlightMode.Intercept)
@@ -1626,7 +1642,7 @@ namespace IERAX_MissionControl
             else
             {
                 // Otherwise, command the drone to fly to the target point
-                FlyToLocation(targetPoint);
+                FlyToLocation(targetPoint,50);
             }
 
 
@@ -1757,7 +1773,7 @@ namespace IERAX_MissionControl
             else if (shipFollowingMode)
             {
                 // Command the drone to fly to the intercept point if not yet within 3 meters.
-                FlyToLocation(interceptPosition);
+                FlyToLocation(interceptPosition,50);
                 Console.WriteLine($"Intercepting {targetShipMarker.ShipName} at updated position: Lat {interceptPosition.Lat}, Lng {interceptPosition.Lng}");
             }
 
@@ -1885,7 +1901,27 @@ namespace IERAX_MissionControl
 
         private void RTLButton_Click(object sender, EventArgs e)
         {
+            // Show confirmation dialog before RTL
+            var result = MessageBox.Show("Are you sure you want the drone to return to launch (RTL)?", "Confirm Return to Launch", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (result == DialogResult.Yes)
+            {
+                // Create the MAVLink command for RTL
+                MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+                req.target_system = 1; // Set to your drone's system ID
+                req.target_component = 1; // Set to your drone's component ID
+                req.command = (ushort)MAVLink.MAV_CMD.RETURN_TO_LAUNCH; // RTL command
+                req.param1 = 0;
+                req.param2 = 0;
+                req.param3 = 0;
+                req.param4 = 0;
+                req.param5 = 0;
+                req.param6 = 0;
+                req.param7 = 0;
 
+                byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+                SendPacket(packet);
+                System.Threading.Thread.Sleep(100);
+            }
         }
 
         private void label10_Click(object sender, EventArgs e)
@@ -2028,39 +2064,35 @@ namespace IERAX_MissionControl
                 return;
             }
 
-            // Open the status window
+            // Open the status window.
             statusForm = new DroneStatusForm();
             statusForm.Show();
-
             statusForm.UpdateStatus("Starting Measurement Pattern...");
 
-            // Take the current drone position as the ship's center
-            PointLatLng shipPosition = droneMarker.Position;
-            double shipHeading = targetShipMarker.Heading; // Ship's heading
+            // Get the ship's heading.
+            double shipHeading = targetShipMarker.Heading; // in degrees
 
+            statusForm.UpdateStatus("Drone altitude set to 25m for plume readings.");
+
+            // Shift the grid center 20 meters to the back of the ship.
+            // "Back" means a bearing that is shipHeading + 180°.
+            PointLatLng gridCenter = GetPositionAtDistanceAndBearing(droneMarker.Position, shipHeading + 180, 20);
+
+            // Create a visualizer instance.
             DroneMeasurementVisualizer visualizer = new DroneMeasurementVisualizer();
 
             // Define grid dimensions:
-            // Overall area: 25 meters left, 25 meters right (50m width) and 20 meters front, 30 meters behind (50m height).
-            // We'll split this 50x50 meter area into a 5x5 grid with 10x10 meter cells.
+            // Overall area: 25 m left, 25 m right (50 m width) and 20 m front, 30 m behind (50 m height)
+            // split into a 5x5 grid (each cell is 10x10 m)
+            double[] colCenters = new double[] { -20, -10, 0, 10, 20 };  // horizontal offsets (east-west)
+            double[] rowCenters = new double[] { 15, 5, -5, -15, -25 };   // vertical offsets (north-south)
 
-            // Pre-calculate the centers for each column (x offsets in meters relative to ship position)
-            // These values center each cell horizontally: -20, -10, 0, 10, 20.
-            double[] colCenters = new double[] { -20, -10, 0, 10, 20 };
-
-            // Pre-calculate the centers for each row (y offsets in meters relative to ship position)
-            // The overall y range is from -30 (back) to +20 (front), so row centers (top to bottom) become: 15, 5, -5, -15, -25.
-            double[] rowCenters = new double[] { 15, 5, -5, -15, -25 };
-
-            // Dictionary to store CO2 readings with the target position as key.
+            // Dictionary to store CO₂ readings for each grid point.
             Dictionary<PointLatLng, float> co2Readings = new Dictionary<PointLatLng, float>();
             int pointIndex = 1;
 
-            // New ordering: iterate row-first in a snake pattern.
-            // First, create a list to hold your grid points (in snake pattern order).
+            // Precompute the grid points using a snake pattern.
             List<PointLatLng> gridPoints = new List<PointLatLng>();
-
-            // Precompute the grid points using the snake pattern.
             for (int row = 0; row < rowCenters.Length; row++)
             {
                 if (row % 2 == 0)
@@ -2070,7 +2102,7 @@ namespace IERAX_MissionControl
                     {
                         double offsetX = colCenters[col];
                         double offsetY = rowCenters[row];
-                        PointLatLng targetPoint = ConvertOffsetToLatLng(shipPosition, offsetX, offsetY);
+                        PointLatLng targetPoint = ConvertOffsetToLatLng(gridCenter, offsetX, offsetY);
                         gridPoints.Add(targetPoint);
                     }
                 }
@@ -2081,42 +2113,84 @@ namespace IERAX_MissionControl
                     {
                         double offsetX = colCenters[col];
                         double offsetY = rowCenters[row];
-                        PointLatLng targetPoint = ConvertOffsetToLatLng(shipPosition, offsetX, offsetY);
+                        PointLatLng targetPoint = ConvertOffsetToLatLng(gridCenter, offsetX, offsetY);
                         gridPoints.Add(targetPoint);
                     }
                 }
             }
 
-         
+            // Iterate through each precomputed grid point.
             foreach (PointLatLng targetPoint in gridPoints)
             {
-                statusForm.UpdateStatus($"Proceeding to point {pointIndex}");
-
-                // Command the drone to fly to the target point.
-                FlyToLocation(targetPoint);
-
-                // Wait 5 seconds for the drone to reach the destination and for the CO2 sensor to stabilize.
-                await Task.Delay(5000);
-
-                // Read the CO2 sensor value.
+                statusForm.UpdateStatus($"Proceeding to grid point {pointIndex}");
+                // Command the drone to fly to the target point at 25m altitude.
+                FlyToLocation(targetPoint, 25);
+                // Wait 5 seconds for the drone to reach the destination and for sensor stabilization.
+                await Task.Delay(7000);
+                // Read the CO₂ sensor value.
                 float currentCO2 = InstantCO2;
-
-                // Save the reading associated with the target point.
+                // Save the reading.
                 co2Readings.Add(targetPoint, currentCO2);
-
-                // Update the PictureBox with the latest readings.
-                visualizer.VisualizeCO2Readings(shipPosition, co2Readings, statusForm.VisualizerPictureBox);
-
+                // Update the visualizer.
+                visualizer.VisualizeCO2Readings(gridCenter, co2Readings, statusForm.VisualizerPictureBox);
                 pointIndex++;
             }
 
+            statusForm.UpdateStatus("Initial grid measurement pattern completed.");
 
-            // Call the visualization function, passing the ship's position, CO2 readings, and the PictureBox.
+            // Determine the grid point with the highest CO₂ reading.
+            PointLatLng bestGridPoint = co2Readings.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
+            statusForm.UpdateStatus("Highest CO₂ grid point determined.");
 
+            // Now perform additional measurements at the best grid point at different altitudes.
+            int[] altimeterLevels = new int[] { 20, 25, 30 };
+            Dictionary<int, float> altitudeReadings = new Dictionary<int, float>();
+
+            foreach (int altimeter in altimeterLevels)
+            {
+                statusForm.UpdateStatus($"Measuring CO₂ at {altimeter}m altitude.");
+                // Command the drone to fly to the best grid point at the specified altimeter.
+                FlyToLocation(bestGridPoint, altimeter);
+                // Wait for the drone to reach the altitude and for sensor stabilization.
+                await Task.Delay(5000);
+                float reading = InstantCO2;
+                altitudeReadings.Add(altimeter, reading);
+            }
+
+            // Choose the altitude with the highest CO₂ reading.
+            int bestAltitude = altitudeReadings.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
+            statusForm.UpdateStatus($"Best CO₂ reading at {bestAltitude}m altitude. Loitering...");
+
+            // Fly to the best altitude (if not already there) and loiter for 1 minute.
+            FlyToLocation(bestGridPoint, bestAltitude);
+            await Task.Delay(60000); // Loiter for 60 seconds
 
             statusForm.UpdateStatus("Ship measurement pattern completed.");
             MessageBox.Show("Measurement pattern completed.");
         }
+
+
+
+        /// <summary>
+        /// Computes a new geographic position from an origin, given a bearing (degrees) and a distance (meters).
+        /// </summary>
+        public static PointLatLng GetPositionAtDistanceAndBearing(PointLatLng origin, double bearingDegrees, double distance)
+        {
+            double earthRadius = 6378137; // in meters (WGS84)
+            double bearingRad = bearingDegrees * Math.PI / 180.0;
+            double latRad = origin.Lat * Math.PI / 180.0;
+            double lngRad = origin.Lng * Math.PI / 180.0;
+
+            double newLatRad = Math.Asin(Math.Sin(latRad) * Math.Cos(distance / earthRadius) +
+                                         Math.Cos(latRad) * Math.Sin(distance / earthRadius) * Math.Cos(bearingRad));
+            double newLngRad = lngRad + Math.Atan2(Math.Sin(bearingRad) * Math.Sin(distance / earthRadius) * Math.Cos(latRad),
+                                                   Math.Cos(distance / earthRadius) - Math.Sin(latRad) * Math.Sin(newLatRad));
+
+            double newLat = newLatRad * 180.0 / Math.PI;
+            double newLng = newLngRad * 180.0 / Math.PI;
+            return new PointLatLng(newLat, newLng);
+        }
+
 
         // Function to switch to Loiter mode
         private void SetLoiterMode()
@@ -2181,6 +2255,25 @@ namespace IERAX_MissionControl
         private void pictureBox4_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void label9_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        // Handler for LandButton click
+        private void LandButton_Click(object sender, EventArgs e)
+        {
+            // Show confirmation dialog before landing
+            var result = MessageBox.Show("Are you sure you want to land the drone at its current position?", "Confirm Landing", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (result == DialogResult.Yes)
+            {
+                // Get the drone's current position
+                PointLatLng currentPosition = GetDroneCurrentPosition();
+                // Initiate landing at the current position
+                LandAtLocation(currentPosition);
+            }
         }
     }
 

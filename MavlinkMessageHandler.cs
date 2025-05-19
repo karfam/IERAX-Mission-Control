@@ -247,7 +247,7 @@ namespace IERAX_MissionControl
                 case 8:
                     return "Land";       // Land at the current position
                 case 9:
-                    return "Drift";      // Drift mode, for smooth turns, good for filming
+                    return "LAND MODE";      // Drift mode, for smooth turns, good for filming
                 case 10:
                     return "Sport";      // Sport mode, fast and aggressive flying
                 case 11:

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Windows.Forms;
 
 
@@ -40,31 +41,50 @@ namespace IERAX_MissionControl
 
         }
 
-     
 
-// Then, implement the event handler:
+
         private void PictureBox1_Paint(object sender, PaintEventArgs e)
         {
- 
-            // Load the ship layout image (consider caching this image instead of loading on every paint)
+            // Load the ship layout image (ideally cache it so it isn't loaded on every paint)
             using (Image shipImage = Properties.Resources.container)
             {
+                // Rotate if needed.
                 shipImage.RotateFlip(RotateFlipType.Rotate90FlipNone);
-                // Define desired size for the ship layout (change these values as needed)
-                int desiredWidth = 100;  // e.g., 100 pixels wide
-                int desiredHeight = 100; // e.g., 100 pixels tall
 
-                // Calculate the position to center the image in the PictureBox
+                // Define desired size.
+                int desiredWidth = 100;  // 100 pixels wide
+                int desiredHeight = 100; // 100 pixels tall
+
+                // Calculate center position then shift one grid row up (assumed 100 pixels per row)
                 int x = (pictureBox1.Width - desiredWidth) / 2;
-                int y = (pictureBox1.Height - desiredHeight) / 2;
+                int gridRowHeight = 100;
+                int y = ((pictureBox1.Height - desiredHeight) / 2) - gridRowHeight;
 
-                // Create a destination rectangle
+                // Destination rectangle for drawing the image.
                 Rectangle destRect = new Rectangle(x, y, desiredWidth, desiredHeight);
 
-                // Draw the image
-                e.Graphics.DrawImage(shipImage, destRect);
+                // Create a ColorMatrix and set its alpha value to 0.5 (50% opacity)
+                ColorMatrix matrix = new ColorMatrix();
+                matrix.Matrix33 = 0.5f; // Alpha component
+
+                // Create ImageAttributes and set the ColorMatrix.
+                using (ImageAttributes attributes = new ImageAttributes())
+                {
+                    attributes.SetColorMatrix(matrix, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+
+                    // Draw the image using the destination rectangle and the ImageAttributes for transparency.
+                    e.Graphics.DrawImage(
+                        shipImage,
+                        destRect,         // Destination rectangle.
+                        0, 0,             // Source X and Y.
+                        shipImage.Width,  // Source width.
+                        shipImage.Height, // Source height.
+                        GraphicsUnit.Pixel,
+                        attributes);      // Apply the transparency.
+                }
             }
         }
+
 
 
 

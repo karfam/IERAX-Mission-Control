@@ -129,10 +129,10 @@
             this.AltHoldButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.AltHoldButton.Location = new System.Drawing.Point(301, 48);
+            this.AltHoldButton.Location = new System.Drawing.Point(300, 48);
             this.AltHoldButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.AltHoldButton.Name = "AltHoldButton";
-            this.AltHoldButton.Size = new System.Drawing.Size(146, 36);
+            this.AltHoldButton.Size = new System.Drawing.Size(145, 36);
             this.AltHoldButton.TabIndex = 11;
             this.AltHoldButton.Text = "AltHold Mode";
             this.AltHoldButton.UseVisualStyleBackColor = true;
@@ -143,10 +143,10 @@
             this.GuidedModeButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.GuidedModeButton.Location = new System.Drawing.Point(301, 4);
+            this.GuidedModeButton.Location = new System.Drawing.Point(300, 4);
             this.GuidedModeButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.GuidedModeButton.Name = "GuidedModeButton";
-            this.GuidedModeButton.Size = new System.Drawing.Size(146, 36);
+            this.GuidedModeButton.Size = new System.Drawing.Size(145, 36);
             this.GuidedModeButton.TabIndex = 12;
             this.GuidedModeButton.Text = "Guided Mode";
             this.GuidedModeButton.UseVisualStyleBackColor = true;
@@ -157,10 +157,10 @@
             this.StopFollowingShipButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.StopFollowingShipButton.Location = new System.Drawing.Point(751, 46);
+            this.StopFollowingShipButton.Location = new System.Drawing.Point(747, 46);
             this.StopFollowingShipButton.Margin = new System.Windows.Forms.Padding(2);
             this.StopFollowingShipButton.Name = "StopFollowingShipButton";
-            this.StopFollowingShipButton.Size = new System.Drawing.Size(146, 40);
+            this.StopFollowingShipButton.Size = new System.Drawing.Size(145, 40);
             this.StopFollowingShipButton.TabIndex = 14;
             this.StopFollowingShipButton.Text = "Stop Following";
             this.StopFollowingShipButton.UseVisualStyleBackColor = true;
@@ -187,10 +187,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.ArmStatusBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.125F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ArmStatusBox.Location = new System.Drawing.Point(451, 46);
+            this.ArmStatusBox.Location = new System.Drawing.Point(449, 46);
             this.ArmStatusBox.Margin = new System.Windows.Forms.Padding(2);
             this.ArmStatusBox.Name = "ArmStatusBox";
-            this.ArmStatusBox.Size = new System.Drawing.Size(146, 27);
+            this.ArmStatusBox.Size = new System.Drawing.Size(145, 27);
             this.ArmStatusBox.TabIndex = 6;
             this.ArmStatusBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.ArmStatusBox.TextChanged += new System.EventHandler(this.ArmStatusBox_TextChanged);
@@ -201,10 +201,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.but_armdisarm.BackColor = System.Drawing.Color.Yellow;
-            this.but_armdisarm.Location = new System.Drawing.Point(453, 4);
+            this.but_armdisarm.Location = new System.Drawing.Point(451, 4);
             this.but_armdisarm.Margin = new System.Windows.Forms.Padding(4);
             this.but_armdisarm.Name = "but_armdisarm";
-            this.but_armdisarm.Size = new System.Drawing.Size(142, 36);
+            this.but_armdisarm.Size = new System.Drawing.Size(141, 36);
             this.but_armdisarm.TabIndex = 3;
             this.but_armdisarm.Text = "Arm/Disarm";
             this.but_armdisarm.UseVisualStyleBackColor = false;
@@ -218,7 +218,7 @@
             this.but_mission.Location = new System.Drawing.Point(153, 48);
             this.but_mission.Margin = new System.Windows.Forms.Padding(4);
             this.but_mission.Name = "but_mission";
-            this.but_mission.Size = new System.Drawing.Size(142, 36);
+            this.but_mission.Size = new System.Drawing.Size(141, 36);
             this.but_mission.TabIndex = 4;
             this.but_mission.Text = "Send Mission";
             this.but_mission.UseVisualStyleBackColor = true;
@@ -246,7 +246,7 @@
             this.but_connect.Location = new System.Drawing.Point(153, 4);
             this.but_connect.Margin = new System.Windows.Forms.Padding(4);
             this.but_connect.Name = "but_connect";
-            this.but_connect.Size = new System.Drawing.Size(142, 36);
+            this.but_connect.Size = new System.Drawing.Size(141, 36);
             this.but_connect.TabIndex = 2;
             this.but_connect.Text = "Connect";
             this.but_connect.UseVisualStyleBackColor = true;
@@ -300,7 +300,7 @@
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
-            this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 232F));
+            this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 233F));
             this.TopPanel.Controls.Add(this.but_connect, 1, 0);
             this.TopPanel.Controls.Add(this.AltHoldButton, 2, 1);
             this.TopPanel.Controls.Add(this.TakeOffButton, 4, 0);
@@ -337,11 +337,11 @@
             this.TakeOffButton.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.TakeOffButton.Cursor = System.Windows.Forms.Cursors.Default;
             this.TakeOffButton.ImageAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.TakeOffButton.Location = new System.Drawing.Point(601, 4);
+            this.TakeOffButton.Location = new System.Drawing.Point(598, 4);
             this.TakeOffButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.TakeOffButton.Name = "TakeOffButton";
             this.TakeOffButton.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.TakeOffButton.Size = new System.Drawing.Size(146, 36);
+            this.TakeOffButton.Size = new System.Drawing.Size(145, 36);
             this.TakeOffButton.TabIndex = 7;
             this.TakeOffButton.Text = "TAKE OFF";
             this.TakeOffButton.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
@@ -356,11 +356,11 @@
             this.ShipInfoLabel.AutoSize = true;
             this.ShipInfoLabel.BackColor = System.Drawing.SystemColors.InfoText;
             this.ShipInfoLabel.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.ShipInfoLabel.Location = new System.Drawing.Point(901, 0);
+            this.ShipInfoLabel.Location = new System.Drawing.Point(896, 0);
             this.ShipInfoLabel.Margin = new System.Windows.Forms.Padding(2, 0, 0, 0);
             this.ShipInfoLabel.Name = "ShipInfoLabel";
             this.TopPanel.SetRowSpan(this.ShipInfoLabel, 2);
-            this.ShipInfoLabel.Size = new System.Drawing.Size(148, 88);
+            this.ShipInfoLabel.Size = new System.Drawing.Size(147, 88);
             this.ShipInfoLabel.TabIndex = 15;
             this.ShipInfoLabel.Text = "AIS Ship Information";
             this.ShipInfoLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -372,10 +372,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.LandButton.BackColor = System.Drawing.Color.Lime;
-            this.LandButton.Location = new System.Drawing.Point(601, 46);
+            this.LandButton.Location = new System.Drawing.Point(598, 46);
             this.LandButton.Margin = new System.Windows.Forms.Padding(2);
             this.LandButton.Name = "LandButton";
-            this.LandButton.Size = new System.Drawing.Size(146, 40);
+            this.LandButton.Size = new System.Drawing.Size(145, 40);
             this.LandButton.TabIndex = 16;
             this.LandButton.Text = "LAND";
             this.LandButton.UseVisualStyleBackColor = false;
@@ -387,10 +387,10 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.RTLButton.BackColor = System.Drawing.SystemColors.Highlight;
             this.RTLButton.ForeColor = System.Drawing.SystemColors.ControlLightLight;
-            this.RTLButton.Location = new System.Drawing.Point(751, 4);
+            this.RTLButton.Location = new System.Drawing.Point(747, 4);
             this.RTLButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.RTLButton.Name = "RTLButton";
-            this.RTLButton.Size = new System.Drawing.Size(146, 36);
+            this.RTLButton.Size = new System.Drawing.Size(145, 36);
             this.RTLButton.TabIndex = 17;
             this.RTLButton.Text = "RETURN TO LAUNCH";
             this.RTLButton.UseVisualStyleBackColor = false;
@@ -416,11 +416,11 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.pictureBox2.Image = global::IERAX_MissionControl.Properties.Resources.ieraxlogo;
-            this.pictureBox2.Location = new System.Drawing.Point(1051, 4);
+            this.pictureBox2.Location = new System.Drawing.Point(1045, 4);
             this.pictureBox2.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
             this.pictureBox2.Name = "pictureBox2";
             this.TopPanel.SetRowSpan(this.pictureBox2, 2);
-            this.pictureBox2.Size = new System.Drawing.Size(229, 80);
+            this.pictureBox2.Size = new System.Drawing.Size(235, 80);
             this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pictureBox2.TabIndex = 18;
             this.pictureBox2.TabStop = false;
@@ -737,8 +737,8 @@
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(90, 49);
             this.label9.TabIndex = 31;
-            this.label9.Text = "EMPTY";
             this.label9.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.label9.Click += new System.EventHandler(this.label9_Click);
             // 
             // label
             // 
@@ -768,7 +768,7 @@
             this.label11.Name = "label11";
             this.label11.Size = new System.Drawing.Size(90, 49);
             this.label11.TabIndex = 33;
-            this.label11.Text = "EMPTY";
+            this.label11.Text = "Wind Speed";
             this.label11.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // label12
@@ -783,7 +783,7 @@
             this.label12.Name = "label12";
             this.label12.Size = new System.Drawing.Size(90, 49);
             this.label12.TabIndex = 34;
-            this.label12.Text = "EMPTY";
+            this.label12.Text = "Wind Direction";
             this.label12.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // BatteryRemainingLabel
@@ -1033,7 +1033,7 @@
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "MPIeraxMain";
-            this.Text = "IERAX MISSION CONTROL";
+            this.Text = "IERAX MISSION CONTROL v1.0";
             this.Load += new System.EventHandler(this.MPIeraxMain_Load);
             this.TopPanel.ResumeLayout(false);
             this.TopPanel.PerformLayout();
