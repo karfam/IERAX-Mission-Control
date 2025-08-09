@@ -28,21 +28,36 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.calculationDataInputButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
+            // 
+            // calculationDataInputButton
+            // 
+            this.calculationDataInputButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
+            this.calculationDataInputButton.Location = new System.Drawing.Point(1176, 830);
+            this.calculationDataInputButton.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.calculationDataInputButton.Name = "calculationDataInputButton";
+            this.calculationDataInputButton.Size = new System.Drawing.Size(288, 147);
+            this.calculationDataInputButton.TabIndex = 0;
+            this.calculationDataInputButton.Text = "Update Background";
+            this.calculationDataInputButton.UseVisualStyleBackColor = true;
+            this.calculationDataInputButton.Click += new System.EventHandler(this.calculationDataInputButton_Click);
             // 
             // AnalyzerForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 25F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(533, 288);
-            this.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.ClientSize = new System.Drawing.Size(1482, 1008);
+            this.Controls.Add(this.calculationDataInputButton);
             this.Name = "AnalyzerForm";
             this.Text = "AnalyzerForm";
-
+            this.Load += new System.EventHandler(this.AnalyzerForm_Load);
             this.ResumeLayout(false);
 
         }
 
         #endregion
+
+        private System.Windows.Forms.Button calculationDataInputButton;
     }
 }

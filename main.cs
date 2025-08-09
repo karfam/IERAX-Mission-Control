@@ -1,24 +1,27 @@
-﻿using GMap.NET.MapProviders;
-using GMap.NET;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.IO;
 using System.IO.Ports;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using GMap.NET;
+using GMap.NET.MapProviders;
 using GMap.NET.WindowsForms;
-using System.Net.WebSockets;
-using System.Threading;
+using GMap.NET.WindowsForms.Markers;
+using IERAX_MissionControl.Properties;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using IERAX_MissionControl.Properties;
-using System.Net.Sockets;
-using System.Net;
 using static MAVLink;
-using System.IO;
 
 
 
@@ -74,7 +77,13 @@ namespace IERAX_MissionControl
         public static float InstantCO2 { get; set; }
         public static float InstantHDCO2 { get; set; }
 
-       
+        private GMapOverlay quakesOverlay;
+        private System.Windows.Forms.Timer quakeTimer;
+
+        private const double MinLat = 35.0, MaxLat = 37.0;   // Santorini area (tweak)
+        private const double MinLon = 24, MaxLon = 27.0;
+
+
         // In Main.cs
         private CameraForm cameraForm;
         private Boolean shipFollowingMode = false;
@@ -90,6 +99,7 @@ namespace IERAX_MissionControl
             InitializeMap();
             InitializeWebSocket();
             this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.TopMost = false;
 
             // Initialize the timer
             droneNavigationTimer = new System.Windows.Forms.Timer();
@@ -99,6 +109,76 @@ namespace IERAX_MissionControl
             // Wire up the LandButton click event
             this.LandButton.Click += new System.EventHandler(this.LandButton_Click);
         }
+
+        private class EqEvent
+        {
+            public DateTimeOffset Time { get; set; }
+            public double Mag { get; set; }
+            public double Lat { get; set; }
+            public double Lon { get; set; }
+            public string Place { get; set; }
+        }
+
+        private List<EqEvent> _eqEvents = new List<EqEvent>();
+
+        private static int CountInRange(IEnumerable<EqEvent> src, DateTimeOffset start, DateTimeOffset end) =>
+            src.Count(e => e.Time >= start && e.Time < end);
+
+        private static (string arrow, string pct) Trend(int current, int prev)
+        {
+            if (prev <= 0) return current > 0 ? ("▲", "new") : ("•", "—");
+            var pct = (current - prev) * 100.0 / prev;
+            return (pct > 0 ? "▲" : pct < 0 ? "▼" : "•", (pct >= 0 ? "+" : "") + pct.ToString("0.#") + "%");
+        }
+
+        private void UpdateEarthquakeStatsLabel()
+        {
+            const double volcLat = 36.4044;
+            const double volcLon = 25.3975;
+            const double radius = 10.0; // km
+
+            var now = DateTimeOffset.UtcNow;
+
+            // --- Global time windows ---
+            var d1Start = now.AddDays(-1);
+            var d1Prev = now.AddDays(-2);
+            var w1Start = now.AddDays(-7);
+            var w1Prev = now.AddDays(-14);
+            var m1Start = now.AddDays(-30);
+            var m1Prev = now.AddDays(-60);
+
+            // --- Global counts ---
+            int dayNow = CountInRange(_eqEvents, d1Start, now);
+            int dayPrev = CountInRange(_eqEvents, d1Prev, d1Start);
+            int weekNow = CountInRange(_eqEvents, w1Start, now);
+            int weekPrev = CountInRange(_eqEvents, w1Prev, w1Start);
+            int monthNow = CountInRange(_eqEvents, m1Start, now);
+            int monthPrev = CountInRange(_eqEvents, m1Prev, m1Start);
+
+            (string a1, string p1) = Trend(dayNow, dayPrev);
+            (string a7, string p7) = Trend(weekNow, weekPrev);
+            (string a30, string p30) = Trend(monthNow, monthPrev);
+
+            // --- Volcano counts ---
+            int volcDay = CountInRangeWithRadius(_eqEvents, d1Start, now, volcLat, volcLon, radius);
+            int volcWeek = CountInRangeWithRadius(_eqEvents, w1Start, now, volcLat, volcLon, radius);
+            int volcMonth = CountInRangeWithRadius(_eqEvents, m1Start, now, volcLat, volcLon, radius);
+
+            // --- Build label text ---
+            var txt = string.Join(Environment.NewLine,
+                $"24h: {dayNow} ({a1} {p1})   <{radius}km: {volcDay}",
+                $"7d:  {weekNow} ({a7} {p7})   <{radius}km: {volcWeek}",
+                $"30d: {monthNow} ({a30} {p30})   <{radius}km: {volcMonth}"
+            );
+
+            if (EarthquakeInfoLabel.InvokeRequired)
+                EarthquakeInfoLabel.Invoke(new Action(() => EarthquakeInfoLabel.Text = txt));
+            else
+                EarthquakeInfoLabel.Text = txt;
+        }
+
+
+
 
         public enum DroneFlightMode
         {
@@ -124,18 +204,117 @@ namespace IERAX_MissionControl
         {
             ConfigureMap();
 
-            // Create a marker overlay and add it to the map
             markersOverlay = new GMapOverlay("markers");
             gMapControl1.Overlays.Add(markersOverlay);
 
-            // Create the drone marker at a default position
-            droneMarker = new DroneMarker(new PointLatLng(37.7128, 21.0060),mavlinkMessageHandler); // Example coordinates
+            quakesOverlay = new GMapOverlay("quakes");
+            gMapControl1.Overlays.Add(quakesOverlay);
+
+            droneMarker = new DroneMarker(new PointLatLng(36.44, 25.40), mavlinkMessageHandler);
             markersOverlay.Markers.Add(droneMarker);
 
-            // Refresh the map to ensure the marker is displayed
             gMapControl1.Refresh();
 
+            // start periodic sync
+            quakeTimer = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
+            quakeTimer.Tick += async (_, __) => await RefreshQuakesFromEMSCAsync();
+            _ = RefreshQuakesFromEMSCAsync();   // fire once now
+            quakeTimer.Start();
         }
+
+
+
+        private async Task RefreshQuakesFromEMSCAsync(int daysBack = 60)
+        {
+            try
+            {
+                var startUtc = DateTime.UtcNow.AddDays(-daysBack).ToString("yyyy-MM-dd'T'HH:mm:ss");
+                var endUtc = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss");
+
+                var url =
+                    "https://www.seismicportal.eu/fdsnws/event/1/query" +
+                    $"?format=json&starttime={startUtc}&endtime={endUtc}" +
+                    $"&minlatitude={MinLat}&maxlatitude={MaxLat}" +
+                    $"&minlongitude={MinLon}&maxlongitude={MaxLon}" +
+                    $"&orderby=time";
+
+                using var http = new HttpClient();
+                var json = await http.GetStringAsync(url);
+
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("features", out var features))
+                    return;
+
+                var newCache = new List<EqEvent>();
+
+                if (gMapControl1.InvokeRequired)
+                    gMapControl1.Invoke(new Action(() => quakesOverlay.Markers.Clear()));
+                else
+                    quakesOverlay.Markers.Clear();
+
+                foreach (var f in features.EnumerateArray())
+                {
+                    var coords = f.GetProperty("geometry").GetProperty("coordinates").EnumerateArray().ToArray();
+                    double lon = coords[0].GetDouble();
+                    double lat = coords[1].GetDouble();
+
+                    var props = f.GetProperty("properties");
+                    double mag = props.TryGetProperty("mag", out var mEl) && mEl.ValueKind == JsonValueKind.Number
+                                 ? mEl.GetDouble() : 0.0;
+
+                    DateTimeOffset when;
+                    if (props.TryGetProperty("time", out var tEl) && tEl.ValueKind == JsonValueKind.Number)
+                        when = DateTimeOffset.FromUnixTimeMilliseconds(tEl.GetInt64()).ToUniversalTime();
+                    else if (props.TryGetProperty("time", out var tStr) && tStr.ValueKind == JsonValueKind.String
+                             && DateTimeOffset.TryParse(tStr.GetString(), out var parsed))
+                        when = parsed.ToUniversalTime();
+                    else
+                        when = DateTimeOffset.UtcNow;
+
+                    string place = props.TryGetProperty("place", out var plc) && plc.ValueKind == JsonValueKind.String
+                                   ? plc.GetString() ?? "" : "";
+
+                    // Add to cache
+                    newCache.Add(new EqEvent
+                    {
+                        Time = when,
+                        Mag = mag,
+                        Lat = lat,
+                        Lon = lon,
+                        Place = place
+                    });
+
+                    // Marker with magnitude circle
+                    var marker = new MagnitudeCircleMarker(new PointLatLng(lat, lon), mag)
+                    {
+                        BaseRadius = 6,
+                        ToolTipText = $"M {mag:F1} — {place}\n{when.LocalDateTime:g}",
+                        ToolTipMode = MarkerTooltipMode.OnMouseOver
+                    };
+
+                    if (gMapControl1.InvokeRequired)
+                        gMapControl1.Invoke(new Action(() => quakesOverlay.Markers.Add(marker)));
+                    else
+                        quakesOverlay.Markers.Add(marker);
+                }
+
+                _eqEvents = newCache;
+
+                if (gMapControl1.InvokeRequired)
+                    gMapControl1.Invoke(new Action(gMapControl1.Refresh));
+                else
+                    gMapControl1.Refresh();
+
+                UpdateEarthquakeStatsLabel();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("EMSC quake sync failed: " + ex.Message);
+            }
+        }
+
+
+
 
         private async void InitializeWebSocket()
         {
@@ -661,11 +840,14 @@ namespace IERAX_MissionControl
                 if (paramName == "CO2")
                 {
                     InstantCO2 = paramValueFloat;
+                    GlobalSensorStats.CO2Instant = InstantCO2; // Update global CO2 value
 
                     if (paramValueFloat > maxCO2)
                     {
                         maxCO2 = paramValueFloat;
                         maxCO2Timestamp = currentTimestamp;
+                        GlobalSensorStats.MaxCO2 = maxCO2; // Update global max CO2 value
+                        GlobalSensorStats.MaxCO2Timestamp = maxCO2Timestamp; // Update global max CO2 timestamp
 
                         if (txtCO2max != null)
                             UpdateMaxValueTextBox(txtCO2max, maxCO2, maxCO2Timestamp);
@@ -678,11 +860,14 @@ namespace IERAX_MissionControl
                 else if (paramName == "HDCO2")
                 {
                     InstantHDCO2 = paramValueFloat;
+                    GlobalSensorStats.HDCO2Instant = InstantHDCO2; // Update global HDCO2 value
 
                     if (paramValueFloat > maxHDCO2)
                     {
                         maxHDCO2 = paramValueFloat;
                         maxHDCO2Timestamp = currentTimestamp;
+                        GlobalSensorStats.MaxHDCO2 = maxHDCO2; // Update global max HDCO2 value
+                        GlobalSensorStats.MaxHDCO2Timestamp = maxHDCO2Timestamp; // Update global max HDCO2 timestamp
 
                         if (txtHDCO2max != null)
                             UpdateMaxValueTextBox(txtHDCO2max, maxHDCO2, maxHDCO2Timestamp);
@@ -1342,8 +1527,8 @@ namespace IERAX_MissionControl
                               $"Vessel Type: {marker.VesselType}";
 
                 // Display ship information in the info panel
-                ShipInfoLabel.Text = info;
-                ShipInfoLabel.Visible = true;
+                EarthquakeInfoLabel.Text = info;
+                EarthquakeInfoLabel.Visible = true;
 
                 // Draw a circle around the ship marker using an image
                 DrawCircleImageAroundMarker(marker);
@@ -2275,6 +2460,36 @@ namespace IERAX_MissionControl
                 LandAtLocation(currentPosition);
             }
         }
+
+        private void txtCO2_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private static double DistanceKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371.0; // Earth radius in km
+            var dLat = (lat2 - lat1) * Math.PI / 180.0;
+            var dLon = (lon2 - lon1) * Math.PI / 180.0;
+
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(lat1 * Math.PI / 180.0) *
+                    Math.Cos(lat2 * Math.PI / 180.0) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+            return R * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        }
+
+        private static int CountInRangeWithRadius(IEnumerable<EqEvent> src, DateTimeOffset start, DateTimeOffset end,
+                                          double centerLat, double centerLon, double radiusKm)
+        {
+            return src.Count(e => e.Time >= start && e.Time < end &&
+                                  DistanceKm(centerLat, centerLon, e.Lat, e.Lon) <= radiusKm);
+        }
+
+
+
+
     }
 
 }
