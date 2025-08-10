@@ -287,6 +287,9 @@
     <Content Include="analyzerData\coefficients.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Resources\Images\landingzone.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\Images\droneMarker.png" />
   </ItemGroup>
   <ItemGroup>

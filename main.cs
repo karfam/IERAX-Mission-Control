@@ -58,6 +58,9 @@ namespace IERAX_MissionControl
         private float maxCO2 = float.MinValue;
         private string maxCO2Timestamp = string.Empty;
 
+        private GMapOverlay plansOverlay;
+
+
         private float maxHDCO2 = float.MinValue;
         private string maxHDCO2Timestamp = string.Empty;
 
@@ -80,8 +83,12 @@ namespace IERAX_MissionControl
         private GMapOverlay quakesOverlay;
         private System.Windows.Forms.Timer quakeTimer;
 
-        private const double MinLat = 35.0, MaxLat = 37.0;   // Santorini area (tweak)
-        private const double MinLon = 24, MaxLon = 27.0;
+        private const double MinLat = 36.0, MaxLat = 37.0;   // Santorini area (tweak)
+        private const double MinLon = 25, MaxLon = 26.0;
+        private GMapOverlay lzOverlay;
+        private Bitmap lzIcon;
+
+        private GMapOverlay gridOverlay;
 
 
         // In Main.cs
@@ -92,11 +99,160 @@ namespace IERAX_MissionControl
         private System.Windows.Forms.Timer droneNavigationTimer;
         private DroneFlightMode currentMode = DroneFlightMode.None;
 
+        public enum Corner { NE, NW, SE, SW }
+
+        private void GenerateAndDrawQuadrantPaths()
+        {
+            double overallCenterLat = 36.4044;
+            double overallCenterLon = 25.3975;
+            double quadSize = 1000;    // meters
+            double laneSpacing = 250;  // meters
+
+            // Calculate quadrant centers
+            Dictionary<Corner, PointLatLng> quadCenters = new Dictionary<Corner, PointLatLng>
+    {
+        { Corner.NW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2,  quadSize/2) },
+        { Corner.NE, ToLatLon(overallCenterLat, overallCenterLon,  quadSize/2,  quadSize/2) },
+        { Corner.SE, ToLatLon(overallCenterLat, overallCenterLon,  quadSize/2, -quadSize/2) },
+        { Corner.SW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2, -quadSize/2) }
+    };
+
+            // Plan for each drone
+            var pathAlpha = PlanFromCorner(new QuadrantPlan
+            {
+                CenterLatDeg = quadCenters[Corner.NE].Lat,
+                CenterLonDeg = quadCenters[Corner.NE].Lng,
+                Width_m = quadSize,
+                Height_m = quadSize,
+                LaneSpacing_m = laneSpacing,
+                StartCorner = Corner.NE
+            });
+
+            var pathBravo = PlanFromCorner(new QuadrantPlan
+            {
+                CenterLatDeg = quadCenters[Corner.SE].Lat,
+                CenterLonDeg = quadCenters[Corner.SE].Lng,
+                Width_m = quadSize,
+                Height_m = quadSize,
+                LaneSpacing_m = laneSpacing,
+                StartCorner = Corner.SE
+            });
+
+            var pathCharlie = PlanFromCorner(new QuadrantPlan
+            {
+                CenterLatDeg = quadCenters[Corner.SW].Lat,
+                CenterLonDeg = quadCenters[Corner.SW].Lng,
+                Width_m = quadSize,
+                Height_m = quadSize,
+                LaneSpacing_m = laneSpacing,
+                StartCorner = Corner.SW
+            });
+
+            var pathDelta = PlanFromCorner(new QuadrantPlan
+            {
+                CenterLatDeg = quadCenters[Corner.NW].Lat,
+                CenterLonDeg = quadCenters[Corner.NW].Lng,
+                Width_m = quadSize,
+                Height_m = quadSize,
+                LaneSpacing_m = laneSpacing,
+                StartCorner = Corner.NW
+            });
+
+            // Draw them
+            DrawAllQuadrantPlans(pathAlpha, pathBravo, pathCharlie, pathDelta);
+        }
+
+        private void DrawAllQuadrantPlans(
+      List<PointLatLng> pathNE,
+      List<PointLatLng> pathSE,
+      List<PointLatLng> pathSW,
+      List<PointLatLng> pathNW)
+        {
+            if (gMapControl1.InvokeRequired)
+            {
+                gMapControl1.Invoke(new Action(() => DrawAllQuadrantPlans(pathNE, pathSE, pathSW, pathNW)));
+                return;
+            }
+
+            EnsurePlansOverlay();
+            ClearPlansOverlay();
+
+            DrawPath("Alpha (NE)", pathNE, Color.DeepSkyBlue);
+            DrawPath("Bravo (SE)", pathSE, Color.Orange);
+            DrawPath("Charlie (SW)", pathSW, Color.MediumSeaGreen);
+            DrawPath("Delta (NW)", pathNW, Color.MediumOrchid);
+
+            gMapControl1.Refresh();
+        }
+
+        private void EnsurePlansOverlay()
+        {
+            if (plansOverlay == null)
+            {
+                plansOverlay = new GMapOverlay("plans_overlay");
+                gMapControl1.Overlays.Add(plansOverlay);
+            }
+        }
+
+        private void ClearPlansOverlay()
+        {
+            if (plansOverlay == null) return;
+            plansOverlay.Routes.Clear();
+            plansOverlay.Markers.Clear();
+        }
+
+        private void DrawPath(string name, IList<PointLatLng> path, Color color)
+        {
+            if (path == null || path.Count == 0) return;
+            EnsurePlansOverlay();
+
+            // Route line
+            var route = new GMapRoute(path, name)
+            {
+                Stroke = new Pen(color, 3f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Solid }
+            };
+            plansOverlay.Routes.Add(route);
+
+            // Start / End markers
+            var start = path[0];
+            var end = path[path.Count - 1];
+
+            var startMk = new GMarkerGoogle(start, GMarkerGoogleType.green_small)
+            {
+                ToolTipText = $"{name} — START",
+                ToolTipMode = MarkerTooltipMode.OnMouseOver
+            };
+            var endMk = new GMarkerGoogle(end, GMarkerGoogleType.red_small)
+            {
+                ToolTipText = $"{name} — END",
+                ToolTipMode = MarkerTooltipMode.OnMouseOver
+            };
+
+            plansOverlay.Markers.Add(startMk);
+            plansOverlay.Markers.Add(endMk);
+        }
+
+        public sealed class QuadrantPlan
+        {
+            public double CenterLatDeg;
+            public double CenterLonDeg;
+            public double Width_m;
+            public double Height_m;
+            public double LaneSpacing_m;
+            public Corner StartCorner;
+            public double HeadingDeg = 0; // optional rotation
+        }
+
+
         public MPIeraxMain()
         {
             InitializeMavlinkHandler();
             InitializeComponent();
             InitializeMap();
+            AddLandingZones();
+            GenerateAndDrawQuadrantPaths();
+            // Fine grid (250 m):
+            AddGridOverNeaKameni(cellKm: 0.25);
             InitializeWebSocket();
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.TopMost = false;
@@ -119,6 +275,14 @@ namespace IERAX_MissionControl
             public string Place { get; set; }
         }
 
+        private sealed class LandingZone
+        {
+            public string Name { get; set; }
+            public double Lat { get; set; }
+            public double Lon { get; set; }
+            public string Description { get; set; }
+        }
+
         private List<EqEvent> _eqEvents = new List<EqEvent>();
 
         private static int CountInRange(IEnumerable<EqEvent> src, DateTimeOffset start, DateTimeOffset end) =>
@@ -130,6 +294,142 @@ namespace IERAX_MissionControl
             var pct = (current - prev) * 100.0 / prev;
             return (pct > 0 ? "▲" : pct < 0 ? "▼" : "•", (pct >= 0 ? "+" : "") + pct.ToString("0.#") + "%");
         }
+
+        private void AddLandingZones()
+        {
+            // Create overlay if not already
+            if (lzOverlay == null)
+            {
+                lzOverlay = new GMapOverlay("landing_zones");
+                gMapControl1.Overlays.Add(lzOverlay);
+            }
+
+            // Load icon from Resources\Images in output folder
+            if (lzIcon == null)
+            {
+                string iconPath = Path.Combine(Application.StartupPath, "Resources", "Images", "landingzone.png");
+                if (!File.Exists(iconPath))
+                {
+                    MessageBox.Show($"Landing zone icon not found:\n{iconPath}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                lzIcon = new Bitmap(iconPath);
+                lzIcon = new Bitmap(lzIcon, new Size(32, 32)); // scale down
+            }
+
+            // Define LZs
+            var zones = new List<LandingZone>
+    {
+        new LandingZone {
+            Name = "LZ Alpha",
+            Lat = 36.415797, Lon = 25.427891,
+            Description = "Northeast of volcano, near port facilities and road access."
+        },
+        new LandingZone {
+            Name = "LZ Bravo",
+            Lat = 36.386587, Lon = 25.427945,
+            Description = "East side, adjacent to utility infrastructure for sustained ops."
+        },
+        new LandingZone {
+            Name = "LZ Charlie",
+            Lat = 36.364377, Lon = 25.383140,
+            Description = "South, low/flat terrain near sea level; sheltered in N winds."
+        },
+        new LandingZone {
+            Name = "LZ Delta",
+            Lat = 36.412694, Lon = 25.350605,
+            Description = "West/NW sector position."
+        }
+    };
+
+            // Add markers to overlay
+            foreach (var z in zones)
+            {
+                var pos = new PointLatLng(z.Lat, z.Lon);
+                var marker = new GMarkerGoogle(pos, lzIcon)
+                {
+                    ToolTipText = $"{z.Name}\n{z.Description}",
+                    ToolTipMode = MarkerTooltipMode.OnMouseOver,
+                    Offset = new Point(-lzIcon.Width / 2, -lzIcon.Height) // tip at coordinates
+                };
+                lzOverlay.Markers.Add(marker);
+            }
+
+            gMapControl1.Refresh();
+        }
+
+        private void AddGridOverNeaKameni(
+    double centerLat = 36.4044,
+    double centerLon = 25.3975,
+    double widthKm = 2.0,
+    double heightKm = 2.0,
+    double cellKm = 0.25)   // 0.25 = 250 m, or try 0.5 for coarser
+        {
+            if (gridOverlay == null)
+            {
+                gridOverlay = new GMapOverlay("nea_kameni_grid");
+                gMapControl1.Overlays.Add(gridOverlay);
+            }
+            else
+            {
+                gridOverlay.Polygons.Clear();
+                gridOverlay.Routes.Clear();
+                gridOverlay.Markers.Clear();
+            }
+
+            // km -> degrees (use center lat for longitude scale)
+            double kmToLatDeg = 1.0 / 111.32; // ~deg per km
+            double kmToLonDeg = 1.0 / (111.32 * Math.Cos(centerLat * Math.PI / 180.0));
+
+            double halfWkm = widthKm / 2.0;
+            double halfHkm = heightKm / 2.0;
+
+            // grid counts
+            int cols = (int)Math.Round(widthKm / cellKm);
+            int rows = (int)Math.Round(heightKm / cellKm);
+
+            // re-snap step to fit exactly
+            double stepLatDeg = cellKm * kmToLatDeg;
+            double stepLonDeg = cellKm * kmToLonDeg;
+
+            double minLat = centerLat - (halfHkm * kmToLatDeg);
+            double minLon = centerLon - (halfWkm * kmToLonDeg);
+
+            // Style
+            var stroke = new Pen(Color.FromArgb(160, 255, 255, 255), 1f);   // light outline
+            var fill = Color.FromArgb(40, 0, 150, 255);                   // faint fill
+
+            for (int r = 0; r < rows; r++)
+            {
+                double lat0 = minLat + r * stepLatDeg;
+                double lat1 = lat0 + stepLatDeg;
+                for (int c = 0; c < cols; c++)
+                {
+                    double lon0 = minLon + c * stepLonDeg;
+                    double lon1 = lon0 + stepLonDeg;
+
+                    var rect = new List<PointLatLng>
+            {
+                new PointLatLng(lat0, lon0),
+                new PointLatLng(lat0, lon1),
+                new PointLatLng(lat1, lon1),
+                new PointLatLng(lat1, lon0)
+            };
+
+                    var poly = new GMap.NET.WindowsForms.GMapPolygon(rect, $"cell_{r}_{c}")
+                    {
+                        Stroke = stroke,
+                        Fill = new SolidBrush(fill),
+                        IsHitTestVisible = false
+                    };
+
+                    gridOverlay.Polygons.Add(poly);
+                }
+            }
+
+            gMapControl1.Refresh();
+        }
+
 
         private void UpdateEarthquakeStatsLabel()
         {
@@ -210,7 +510,7 @@ namespace IERAX_MissionControl
             quakesOverlay = new GMapOverlay("quakes");
             gMapControl1.Overlays.Add(quakesOverlay);
 
-            droneMarker = new DroneMarker(new PointLatLng(36.44, 25.40), mavlinkMessageHandler);
+            droneMarker = new DroneMarker(new PointLatLng(36.415797, 25.427891), mavlinkMessageHandler);
             markersOverlay.Markers.Add(droneMarker);
 
             gMapControl1.Refresh();
@@ -372,7 +672,7 @@ namespace IERAX_MissionControl
         private void ConfigureMap()
         {
             gMapControl1.MapProvider = GMapProviders.GoogleSatelliteMap;
-            gMapControl1.Position = new PointLatLng(37.7128, 21.0060); 
+            gMapControl1.Position = new PointLatLng(36.41, 25.42);
             gMapControl1.MinZoom = 1;
             gMapControl1.MaxZoom = 20;
             gMapControl1.Zoom = 10;
@@ -2485,6 +2785,77 @@ namespace IERAX_MissionControl
         {
             return src.Count(e => e.Time >= start && e.Time < end &&
                                   DistanceKm(centerLat, centerLon, e.Lat, e.Lon) <= radiusKm);
+        }
+
+
+        static (double dLatDegPerMeter, double dLonDegPerMeter) DegPerMeter(double lat0Deg)
+        {
+            const double mPerDegLat = 111_320.0;
+            double mPerDegLon = 111_320.0 * Math.Cos(lat0Deg * Math.PI / 180.0);
+            return (1.0 / mPerDegLat, 1.0 / mPerDegLon);
+        }
+
+        // rotate ENU coordinates
+        static (double x, double y) Rot(double x, double y, double headingDeg)
+        {
+            double th = headingDeg * Math.PI / 180.0;
+            double c = Math.Cos(th), s = Math.Sin(th);
+            return (x * c - y * s, x * s + y * c);
+        }
+
+        static PointLatLng ToLatLon(double lat0, double lon0, double x_m, double y_m)
+        {
+            var (dLat, dLon) = DegPerMeter(lat0);
+            return new PointLatLng(lat0 + y_m * dLat, lon0 + x_m * dLon);
+        }
+
+        // Plan a lawnmower starting from a given corner of the quadrant
+        public static List<PointLatLng> PlanFromCorner(QuadrantPlan p)
+        {
+            double halfW = p.Width_m / 2.0;
+            double halfH = p.Height_m / 2.0;
+
+            // determine quadrant bounds in local ENU relative to center
+            double xMin = -halfW;
+            double xMax = halfW;
+            double yMin = -halfH;
+            double yMax = halfH;
+
+            // choose start coordinates based on corner
+            double startX = (p.StartCorner == Corner.NE || p.StartCorner == Corner.SE) ? xMax : xMin;
+            double startY = (p.StartCorner == Corner.NE || p.StartCorner == Corner.NW) ? yMax : yMin;
+
+            bool horizontal = true; // east–west lanes for 1 km sweeps
+            var path = new List<PointLatLng>();
+
+            if (horizontal)
+            {
+                // stepping direction depends on start corner
+                bool stepSouth = (p.StartCorner == Corner.NE || p.StartCorner == Corner.NW);
+                bool westFirst = (p.StartCorner == Corner.NE || p.StartCorner == Corner.SE);
+
+                // ✅ Add half-lane offset so we start in the middle of first lane
+                double initialYOffset = stepSouth ? -(p.LaneSpacing_m / 2.0) : (p.LaneSpacing_m / 2.0);
+
+                int lanes = (int)Math.Ceiling(p.Height_m / p.LaneSpacing_m);
+
+                for (int i = 0; i < lanes; i++)
+                {
+                    double y = startY + initialYOffset + (stepSouth ? -i * p.LaneSpacing_m : i * p.LaneSpacing_m);
+                    bool goWest = westFirst ^ (i % 2 == 1);
+
+                    double xA = goWest ? xMax : xMin;
+                    double xB = goWest ? xMin : xMax;
+
+                    var (xrA, yrA) = Rot(xA, y, p.HeadingDeg);
+                    var (xrB, yrB) = Rot(xB, y, p.HeadingDeg);
+
+                    path.Add(ToLatLon(p.CenterLatDeg, p.CenterLonDeg, xrA, yrA));
+                    path.Add(ToLatLon(p.CenterLatDeg, p.CenterLonDeg, xrB, yrB));
+                }
+            }
+
+            return path;
         }
 
 
