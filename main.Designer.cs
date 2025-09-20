@@ -44,6 +44,7 @@
             this.cmb_baudrate = new System.Windows.Forms.ComboBox();
             this.CMB_comport = new System.Windows.Forms.ComboBox();
             this.TopPanel = new System.Windows.Forms.TableLayoutPanel();
+            this.ActiveDroneComboBox = new System.Windows.Forms.ComboBox();
             this.TakeOffButton = new System.Windows.Forms.Button();
             this.EarthquakeInfoLabel = new System.Windows.Forms.Label();
             this.LandButton = new System.Windows.Forms.Button();
@@ -316,17 +317,32 @@
             this.TopPanel.Controls.Add(this.RTLButton, 5, 0);
             this.TopPanel.Controls.Add(this.pictureBox1, 7, 1);
             this.TopPanel.Controls.Add(this.pictureBox2, 7, 0);
+            this.TopPanel.Controls.Add(this.ActiveDroneComboBox, 6, 1);
             this.TopPanel.Dock = System.Windows.Forms.DockStyle.Top;
             this.TopPanel.Location = new System.Drawing.Point(0, 0);
             this.TopPanel.Margin = new System.Windows.Forms.Padding(0);
             this.TopPanel.Name = "TopPanel";
-            this.TopPanel.RowCount = 1;
+            this.TopPanel.RowCount = 2;
             this.TopPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.TopPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.TopPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 0F));
             this.TopPanel.Size = new System.Drawing.Size(1282, 88);
             this.TopPanel.TabIndex = 16;
             this.TopPanel.Paint += new System.Windows.Forms.PaintEventHandler(this.tableLayoutPanel1_Paint);
+            // 
+            // ActiveDroneComboBox
+            // 
+            this.ActiveDroneComboBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.ActiveDroneComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.ActiveDroneComboBox.FormattingEnabled = true;
+            this.ActiveDroneComboBox.Location = new System.Drawing.Point(883, 46);
+            this.ActiveDroneComboBox.Margin = new System.Windows.Forms.Padding(2);
+            this.ActiveDroneComboBox.Name = "ActiveDroneComboBox";
+            this.ActiveDroneComboBox.Size = new System.Drawing.Size(145, 24);
+            this.ActiveDroneComboBox.TabIndex = 19;
+            this.ActiveDroneComboBox.SelectedIndexChanged += new System.EventHandler(this.ActiveDroneComboBox_SelectedIndexChanged);
             // 
             // TakeOffButton
             // 
@@ -359,8 +375,7 @@
             this.EarthquakeInfoLabel.Location = new System.Drawing.Point(883, 0);
             this.EarthquakeInfoLabel.Margin = new System.Windows.Forms.Padding(2, 0, 0, 0);
             this.EarthquakeInfoLabel.Name = "EarthquakeInfoLabel";
-            this.TopPanel.SetRowSpan(this.EarthquakeInfoLabel, 2);
-            this.EarthquakeInfoLabel.Size = new System.Drawing.Size(145, 88);
+            this.EarthquakeInfoLabel.Size = new System.Drawing.Size(145, 44);
             this.EarthquakeInfoLabel.TabIndex = 15;
             this.EarthquakeInfoLabel.Text = "AIS Ship Information";
             this.EarthquakeInfoLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -1107,6 +1122,7 @@
         private System.Windows.Forms.Button analyzerBT;
         private System.Windows.Forms.Label label16;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.ComboBox ActiveDroneComboBox;
     }
 }
 

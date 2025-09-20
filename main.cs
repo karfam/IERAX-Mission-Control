@@ -25,8 +25,6 @@ using static MAVLink;
 
 
 
-
-
 namespace IERAX_MissionControl
 {
     public partial class MPIeraxMain : Form
@@ -312,6 +310,9 @@ namespace IERAX_MissionControl
                 this.but_connect.Click += new System.EventHandler(this.OpenConnectionsWindow_Click);
             }
             catch { /* ignore if not wired yet */ }
+
+            // Initialize Active Drone dropdown
+            RefreshActiveDroneComboItems();
         }
 
         private class EqEvent
@@ -550,6 +551,42 @@ namespace IERAX_MissionControl
                 UpdateAltimeterBox,
                 UpdateDroneModeTextBox,
                 UpdateTextLabelGUI);
+        }
+
+        private void RefreshActiveDroneComboItems()
+        {
+            if (ActiveDroneComboBox == null)
+                return;
+
+            if (ActiveDroneComboBox.InvokeRequired)
+            {
+                ActiveDroneComboBox.Invoke(new Action(RefreshActiveDroneComboItems));
+                return;
+            }
+
+            var selected = _activeConnectionId;
+            ActiveDroneComboBox.Items.Clear();
+            foreach (var id in _connections.Keys)
+            {
+                ActiveDroneComboBox.Items.Add(id);
+            }
+
+            if (!string.IsNullOrEmpty(selected) && _connections.ContainsKey(selected))
+            {
+                ActiveDroneComboBox.SelectedItem = selected;
+            }
+            else if (ActiveDroneComboBox.Items.Count > 0)
+            {
+                ActiveDroneComboBox.SelectedIndex = 0;
+            }
+        }
+
+        private void ActiveDroneComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (ActiveDroneComboBox.SelectedItem is string id && _connections.ContainsKey(id))
+            {
+                _activeConnectionId = id;
+            }
         }
 
 
@@ -844,10 +881,10 @@ namespace IERAX_MissionControl
                 // per-connection handler and marker
                 ctx.Handler = new MavlinkMessageHandler(
                     pos => UpdateDroneMarkerForConnection(id, pos),
-                    UpdateArmStatusBox,
-                    UpdateAltimeterBox,
-                    UpdateDroneModeTextBox,
-                    UpdateTextLabelGUI);
+                    isArmed => { if (_activeConnectionId == id) UpdateArmStatusBox(isArmed); },
+                    alt => { if (_activeConnectionId == id) UpdateAltimeterBox(alt); },
+                    mode => { if (_activeConnectionId == id) UpdateDroneModeTextBox(mode); },
+                    (name, val) => { if (_activeConnectionId == id) UpdateTextLabelGUI(name, val); });
 
                 var initialPos = new PointLatLng(36.415797, 25.427891);
                 ctx.Marker = new DroneMarker(initialPos, ctx.Handler);
@@ -856,6 +893,9 @@ namespace IERAX_MissionControl
                 _connections[id] = ctx;
                 if (string.IsNullOrEmpty(_activeConnectionId))
                     _activeConnectionId = id;
+
+                // update active drones dropdown
+                RefreshActiveDroneComboItems();
 
                 isTcpConnection = false;
                 isConnected = true;
@@ -948,10 +988,10 @@ namespace IERAX_MissionControl
                 // Create a per-connection MAVLink message handler with captured id
                 ctx.Handler = new MavlinkMessageHandler(
                     pos => UpdateDroneMarkerForConnection(id, pos),
-                    UpdateArmStatusBox,
-                    UpdateAltimeterBox,
-                    UpdateDroneModeTextBox,
-                    UpdateTextLabelGUI);
+                    isArmed => { if (_activeConnectionId == id) UpdateArmStatusBox(isArmed); },
+                    alt => { if (_activeConnectionId == id) UpdateAltimeterBox(alt); },
+                    mode => { if (_activeConnectionId == id) UpdateDroneModeTextBox(mode); },
+                    (name, val) => { if (_activeConnectionId == id) UpdateTextLabelGUI(name, val); });
 
                 // Create marker for this drone (initial position arbitrary; will be updated on first GPS msg)
                 var initialPos = new PointLatLng(36.415797, 25.427891);
@@ -973,6 +1013,8 @@ namespace IERAX_MissionControl
                     but_connect.Text = "Connected";
                     but_connect.BackColor = Color.Green;
                     but_connect.ForeColor = Color.White;
+                    // update active drones dropdown
+                    RefreshActiveDroneComboItems();
                 }));
 
                 Console.WriteLine($"✅ Connected to SITL at {ip}:{port} (id={id})");
@@ -2166,7 +2208,6 @@ namespace IERAX_MissionControl
         public void UpdateTextLabelAction(Control control, string value)
         {
            
-            
 
             if (control.InvokeRequired)
             {
