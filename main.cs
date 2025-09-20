@@ -37,7 +37,7 @@ namespace IERAX_MissionControl
         object readlock = new object();
         // our target sysid
         byte sysid;
-        // our target compid
+        // our target compid;
         byte compid;
 
         private DroneStatusForm statusForm;
@@ -100,6 +100,46 @@ namespace IERAX_MissionControl
         private DroneFlightMode currentMode = DroneFlightMode.None;
 
         public enum Corner { NE, NW, SE, SW }
+
+        // ================= MULTI-DRONE SUPPORT =================
+        // Each connection/drone context tracked separately
+        private class DroneConnectionContext
+        {
+            public string ConnectionId { get; set; }
+            public bool IsTcp { get; set; }
+            public TcpClient TcpClient { get; set; }
+            public System.IO.Stream Stream { get; set; }
+            public SerialPort SerialPort { get; set; }
+            public byte SysId { get; set; }
+            public byte CompId { get; set; }
+            public MavlinkMessageHandler Handler { get; set; }
+            public DroneMarker Marker { get; set; }
+            public CancellationTokenSource Cts { get; set; }
+            public bool IsConnected { get; set; }
+        }
+
+        // All active drone connections by connectionId
+        private readonly Dictionary<string, DroneConnectionContext> _connections = new Dictionary<string, DroneConnectionContext>();
+        // Currently active/selected connection id (used by default in UI actions)
+        private string _activeConnectionId;
+        private int _connCounter = 0;
+
+        private string GenerateConnectionId(string kind, string hint)
+        {
+            // kind: "tcp" or "serial", hint: ip:port or COM name
+            _connCounter++;
+            return $"{kind}:{hint}#{_connCounter}";
+        }
+
+        private DroneConnectionContext GetActiveConnection()
+        {
+            if (!string.IsNullOrEmpty(_activeConnectionId) && _connections.TryGetValue(_activeConnectionId, out var ctx))
+                return ctx;
+            // fallback: first available
+            var first = _connections.Values.FirstOrDefault();
+            return first;
+        }
+        // =======================================================
 
         private void GenerateAndDrawQuadrantPaths()
         {
@@ -476,8 +516,8 @@ namespace IERAX_MissionControl
             var txt = string.Join(Environment.NewLine,
                 $"24h: {dayNow} ({a1} {p1})   <{radius}km: {volcDay}",
                 $"7d:  {weekNow} ({a7} {p7})   <{radius}km: {volcWeek}",
-                $"30d: {monthNow} ({a30} {p30})   <{radius}km: {volcMonth}"
-            );
+                $"30d: {monthNow} ({a30} {p30})   <{radius}km: {volcMonth}")
+            ;
 
             if (EarthquakeInfoLabel.InvokeRequired)
                 EarthquakeInfoLabel.Invoke(new Action(() => EarthquakeInfoLabel.Text = txt));
@@ -503,8 +543,13 @@ namespace IERAX_MissionControl
         // Initialize the MavlinkMessageHandler with delegates to update the drone marker and arm status box
         private void InitializeMavlinkHandler()
         {
-            // Initialize the MavlinkMessageHandler with delegates for updating the drone marker, arm status, and altimeter
-            mavlinkMessageHandler = new MavlinkMessageHandler(UpdateDroneMarker, UpdateArmStatusBox, UpdateAltimeterBox,UpdateDroneModeTextBox,UpdateTextLabelGUI);
+            // Initialize a default MavlinkMessageHandler (for legacy single-drone flow)
+            mavlinkMessageHandler = new MavlinkMessageHandler(
+                pos => UpdateDroneMarkerForConnection(_activeConnectionId ?? "default", pos),
+                UpdateArmStatusBox,
+                UpdateAltimeterBox,
+                UpdateDroneModeTextBox,
+                UpdateTextLabelGUI);
         }
 
 
@@ -518,8 +563,8 @@ namespace IERAX_MissionControl
             quakesOverlay = new GMapOverlay("quakes");
             gMapControl1.Overlays.Add(quakesOverlay);
 
-            droneMarker = new DroneMarker(new PointLatLng(36.415797, 25.427891), mavlinkMessageHandler);
-            markersOverlay.Markers.Add(droneMarker);
+            // Do not create a single global drone marker here; markers are created per-connection
+            // and added when connections are established.
 
             gMapControl1.Refresh();
 
@@ -732,22 +777,16 @@ namespace IERAX_MissionControl
 
                 if (selectedConnection.Contains(":")) // TCP Connection Handling
                 {
-                    if (isConnected)
-                    {
-                        DisconnectTCP();
-                        return false;
-                    }
-                    else
-                    {
-                        string[] parts = selectedConnection.Split(':');
-                        string ip = parts[0];
-                        int port = int.Parse(parts[1]);
-                        var ok = await ConnectViaTCP(ip, port);
-                        return ok;
-                    }
+                    // Multiple TCP connections supported; connect without disconnecting others
+                    string[] parts = selectedConnection.Split(':');
+                    string ip = parts[0];
+                    int port = int.Parse(parts[1]);
+                    var ok = await ConnectViaTCP(ip, port);
+                    return ok;
                 }
                 else // Serial Port Connection Handling
                 {
+                    // For now, maintain single serialPort1 behavior (legacy). Multi-serial can be added similarly.
                     if (serialPort1.IsOpen)
                     {
                         DisconnectSerial();
@@ -791,13 +830,52 @@ namespace IERAX_MissionControl
                     but_connect.ForeColor = Color.White;
                 }));
 
-                // Start background worker to handle connection
-                BackgroundWorker bgw = new BackgroundWorker();
-                bgw.DoWork += bgw_DoWork;
-                bgw.RunWorkerAsync();
+                // Create connection context for serial
+                string id = GenerateConnectionId("serial", portName);
+                var ctx = new DroneConnectionContext
+                {
+                    ConnectionId = id,
+                    IsTcp = false,
+                    SerialPort = serialPort1,
+                    Stream = serialPort1.BaseStream,
+                    Cts = new CancellationTokenSource(),
+                    IsConnected = true
+                };
+                // per-connection handler and marker
+                ctx.Handler = new MavlinkMessageHandler(
+                    pos => UpdateDroneMarkerForConnection(id, pos),
+                    UpdateArmStatusBox,
+                    UpdateAltimeterBox,
+                    UpdateDroneModeTextBox,
+                    UpdateTextLabelGUI);
+
+                var initialPos = new PointLatLng(36.415797, 25.427891);
+                ctx.Marker = new DroneMarker(initialPos, ctx.Handler);
+                markersOverlay.Markers.Add(ctx.Marker);
+
+                _connections[id] = ctx;
+                if (string.IsNullOrEmpty(_activeConnectionId))
+                    _activeConnectionId = id;
 
                 isTcpConnection = false;
                 isConnected = true;
+
+                // Start handling MAVLink messages
+                _ = Task.Run(() => HandleMavlinkMessages(ctx));
+
+                // Optional: send heartbeat and setup streams for serial as well
+                _ = Task.Run(async () =>
+                {
+                    bool ok = await SendMavlinkHeartbeatAsync(ctx);
+                    if (ok)
+                    {
+                        await Task.Delay(1000);
+                        RequestParameters(ctx);
+                        await Task.Delay(2000);
+                        RequestDataStream(ctx);
+                    }
+                });
+
                 return true;
             }
             catch (Exception ex)
@@ -852,22 +930,55 @@ namespace IERAX_MissionControl
         {
             try
             {
-                TcpClient client = new TcpClient(ip, port);
-                tcpStream = client.GetStream();
+                var client = new TcpClient(ip, port);
+                var stream = client.GetStream();
+
+                // Create connection context
+                string id = GenerateConnectionId("tcp", $"{ip}:{port}");
+                var ctx = new DroneConnectionContext
+                {
+                    ConnectionId = id,
+                    IsTcp = true,
+                    TcpClient = client,
+                    Stream = stream,
+                    Cts = new CancellationTokenSource(),
+                    IsConnected = true
+                };
+
+                // Create a per-connection MAVLink message handler with captured id
+                ctx.Handler = new MavlinkMessageHandler(
+                    pos => UpdateDroneMarkerForConnection(id, pos),
+                    UpdateArmStatusBox,
+                    UpdateAltimeterBox,
+                    UpdateDroneModeTextBox,
+                    UpdateTextLabelGUI);
+
+                // Create marker for this drone (initial position arbitrary; will be updated on first GPS msg)
+                var initialPos = new PointLatLng(36.415797, 25.427891);
+                ctx.Marker = new DroneMarker(initialPos, ctx.Handler);
+                markersOverlay.Markers.Add(ctx.Marker);
+
+                _connections[id] = ctx;
+                // set active if none selected yet
+                if (string.IsNullOrEmpty(_activeConnectionId))
+                    _activeConnectionId = id;
+
+                // Keep legacy fields in sync with the currently active connection
+                tcpStream = stream;
                 isTcpConnection = true;
+                isConnected = true;
 
                 this.Invoke(new Action(() =>
                 {
                     but_connect.Text = "Connected";
                     but_connect.BackColor = Color.Green;
                     but_connect.ForeColor = Color.White;
-                    isConnected = true;
                 }));
 
-                Console.WriteLine($"✅ Connected to SITL at {ip}:{port}");
+                Console.WriteLine($"✅ Connected to SITL at {ip}:{port} (id={id})");
 
                 // Send heartbeat and wait for SYSID response
-                bool sysIdReceived = await SendMavlinkHeartbeatAsync();
+                bool sysIdReceived = await SendMavlinkHeartbeatAsync(ctx);
                 if (!sysIdReceived)
                 {
                     Console.WriteLine("❌ Connection failed: No SYSID received.");
@@ -876,15 +987,15 @@ namespace IERAX_MissionControl
                 await Task.Delay(1000);
 
                 // Request system parameters
-                RequestParameters();
+                RequestParameters(ctx);
                 await Task.Delay(2000);
 
                 // Request telemetry data streams
-                RequestDataStream();
+                RequestDataStream(ctx);
                 await Task.Delay(1000);
 
-                // Start handling MAVLink messages
-                _ = Task.Run(() => HandleMavlinkMessages(tcpStream));
+                // Start handling MAVLink messages for this connection
+                _ = Task.Run(() => HandleMavlinkMessages(ctx));
                 return true;
             }
             catch (Exception ex)
@@ -894,9 +1005,9 @@ namespace IERAX_MissionControl
             }
         }
 
-        private async Task<bool> SendMavlinkHeartbeatAsync()
+        private async Task<bool> SendMavlinkHeartbeatAsync(DroneConnectionContext ctx)
         {
-            if (tcpStream == null)
+            if (ctx == null || ctx.Stream == null)
             {
                 Console.WriteLine("TCP stream is null. Cannot send heartbeat.");
                 return false;
@@ -915,14 +1026,13 @@ namespace IERAX_MissionControl
 
                 byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.HEARTBEAT, heartbeat);
 
-           
-                    tcpStream.Write(packet, 0, packet.Length);
-                    tcpStream.Flush();
-                    Console.WriteLine($"✅ Sent MAVLink heartbeat over TCP ");
+                ctx.Stream.Write(packet, 0, packet.Length);
+                ctx.Stream.Flush();
+                Console.WriteLine($"✅ Sent MAVLink heartbeat over TCP to {ctx.ConnectionId}");
                 await Task.Delay(500);
 
                 // Now wait for a response for up to 2.2 seconds
-                return await WaitForSysIdCompIdAsync();
+                return await WaitForSysIdCompIdAsync(ctx);
             }
             catch (Exception ex)
             {
@@ -931,7 +1041,7 @@ namespace IERAX_MissionControl
             }
         }
 
-        private async Task<bool> WaitForSysIdCompIdAsync()
+        private async Task<bool> WaitForSysIdCompIdAsync(DroneConnectionContext ctx)
         {
             DateTime timeout = DateTime.Now.AddMilliseconds(2200);
 
@@ -940,7 +1050,7 @@ namespace IERAX_MissionControl
                 MAVLink.MAVLinkMessage packet;
                 lock (readlock)
                 {
-                    packet = mavlink.ReadPacket(tcpStream);
+                    packet = mavlink.ReadPacket(ctx.Stream);
                     if (packet == null || packet.data == null)
                         continue;
                 }
@@ -949,10 +1059,14 @@ namespace IERAX_MissionControl
                 if (packet.data.GetType() == typeof(MAVLink.mavlink_heartbeat_t))
                 {
                     var hb = (MAVLink.mavlink_heartbeat_t)packet.data;
-                    sysid = packet.sysid;
-                    compid = packet.compid;
+                    ctx.SysId = packet.sysid;
+                    ctx.CompId = packet.compid;
 
-                    Console.WriteLine($"✅ Received SYSID={sysid}, COMPID={compid}");
+                    // keep legacy for active
+                    sysid = ctx.SysId;
+                    compid = ctx.CompId;
+
+                    Console.WriteLine($"✅ Received SYSID={ctx.SysId}, COMPID={ctx.CompId} on {ctx.ConnectionId}");
                     return true;
                 }
 
@@ -968,7 +1082,8 @@ namespace IERAX_MissionControl
 
         private void SendMavlinkHeartbeat()
         {
-            if (tcpStream == null)
+            var ctx = GetActiveConnection();
+            if (ctx == null || ctx.Stream == null)
             {
                 Console.WriteLine("TCP stream is null. Cannot send heartbeat.");
                 return;
@@ -989,9 +1104,9 @@ namespace IERAX_MissionControl
 
                 for (int i = 0; i < 5; i++) // Send 5 times
                 {
-                    tcpStream.Write(packet, 0, packet.Length);
-                    tcpStream.Flush();
-                    Console.WriteLine($"✅ Sent MAVLink heartbeat over TCP (Attempt {i + 1}/5)");
+                    ctx.Stream.Write(packet, 0, packet.Length);
+                    ctx.Stream.Flush();
+                    Console.WriteLine($"✅ Sent MAVLink heartbeat over TCP (Attempt {i + 1}/5) to {ctx.ConnectionId}");
                     Thread.Sleep(1000);
                 }
             }
@@ -1004,9 +1119,9 @@ namespace IERAX_MissionControl
 
 
 
-        private void RequestDataStream()
+        private void RequestDataStream(DroneConnectionContext ctx)
         {
-            if (sysid == 0 || compid == 0)
+            if (ctx == null || ctx.SysId == 0 || ctx.CompId == 0)
             {
                 Console.WriteLine("❌ System ID or Component ID not received yet. Cannot request data.");
                 return;
@@ -1018,42 +1133,42 @@ namespace IERAX_MissionControl
                 {
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTENDED_STATUS, req_message_rate = 2, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTENDED_STATUS, req_message_rate = 2, start_stop = 1
             }),
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.POSITION, req_message_rate = 2, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.POSITION, req_message_rate = 2, start_stop = 1
             }),
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA1, req_message_rate = 4, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA1, req_message_rate = 4, start_stop = 1
             }),
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA2, req_message_rate = 4, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA2, req_message_rate = 4, start_stop = 1
             }),
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA3, req_message_rate = 2, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.EXTRA3, req_message_rate = 2, start_stop = 1
             }),
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.RAW_SENSORS, req_message_rate = 2, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.RAW_SENSORS, req_message_rate = 2, start_stop = 1
             }),
             mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.REQUEST_DATA_STREAM, new MAVLink.mavlink_request_data_stream_t()
             {
-                target_system = sysid, target_component = compid, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.RC_CHANNELS, req_message_rate = 2, start_stop = 1
+                target_system = ctx.SysId, target_component = ctx.CompId, req_stream_id = (byte)MAVLink.MAV_DATA_STREAM.RC_CHANNELS, req_message_rate = 2, start_stop = 1
             })
                 };
 
                 foreach (var packet in requests)
                 {
-                    tcpStream.Write(packet, 0, packet.Length);
-                    tcpStream.Flush();
+                    ctx.Stream.Write(packet, 0, packet.Length);
+                    ctx.Stream.Flush();
                     Thread.Sleep(500);
                 }
 
-                Console.WriteLine("📡 Requested multiple data streams from SITL.");
+                Console.WriteLine($"📡 Requested multiple data streams from {ctx.ConnectionId}.");
             }
             catch (Exception ex)
             {
@@ -1061,9 +1176,18 @@ namespace IERAX_MissionControl
             }
         }
 
+        // Backward-compatible wrappers
+        private void RequestDataStream()
+        {
+            var ctx = GetActiveConnection();
+            if (ctx != null)
+                RequestDataStream(ctx);
+        }
+
         private void RequestAutopilotCapabilities()
         {
-            if (sysid == 0 || compid == 0)
+            var ctx = GetActiveConnection();
+            if (ctx == null || ctx.SysId == 0 || ctx.CompId == 0)
             {
                 Console.WriteLine("❌ System ID or Component ID not received yet. Cannot request capabilities.");
                 return;
@@ -1073,15 +1197,15 @@ namespace IERAX_MissionControl
             {
                 MAVLink.mavlink_command_long_t cmd = new MAVLink.mavlink_command_long_t()
                 {
-                    target_system = sysid,
-                    target_component = compid,
+                    target_system = ctx.SysId,
+                    target_component = ctx.CompId,
                     command = (ushort)MAVLink.MAV_CMD.REQUEST_AUTOPILOT_CAPABILITIES
                 };
 
                 byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
 
-                tcpStream.Write(packet, 0, packet.Length);
-                tcpStream.Flush();
+                ctx.Stream.Write(packet, 0, packet.Length);
+                ctx.Stream.Flush();
 
                 Console.WriteLine("📡 Requested Autopilot Capabilities.");
             }
@@ -1091,9 +1215,9 @@ namespace IERAX_MissionControl
             }
         }
 
-        private void RequestParameters()
+        private void RequestParameters(DroneConnectionContext ctx)
         {
-            if (sysid == 0 || compid == 0)
+            if (ctx == null || ctx.SysId == 0 || ctx.CompId == 0)
             {
                 Console.WriteLine("❌ System ID or Component ID not received yet. Cannot request parameters.");
                 return;
@@ -1103,14 +1227,14 @@ namespace IERAX_MissionControl
             {
                 MAVLink.mavlink_param_request_list_t paramRequest = new MAVLink.mavlink_param_request_list_t()
                 {
-                    target_system = sysid,
-                    target_component = compid
+                    target_system = ctx.SysId,
+                    target_component = ctx.CompId
                 };
 
                 byte[] packet = mavlink.GenerateMAVLinkPacket20(MAVLink.MAVLINK_MSG_ID.PARAM_REQUEST_LIST, paramRequest);
 
-                tcpStream.Write(packet, 0, packet.Length);
-                tcpStream.Flush();
+                ctx.Stream.Write(packet, 0, packet.Length);
+                ctx.Stream.Flush();
 
                 Console.WriteLine("🔄 Requested SITL parameters.");
             }
@@ -1120,20 +1244,55 @@ namespace IERAX_MissionControl
             }
         }
 
+        private void RequestParameters()
+        {
+            var ctx = GetActiveConnection();
+            if (ctx != null)
+                RequestParameters(ctx);
+        }
 
+        private void HandleMavlinkMessages(DroneConnectionContext ctx)
+        {
+            MAVLink.MavlinkParse localParser = new MAVLink.MavlinkParse();
 
+            while (ctx != null && ctx.IsConnected)
+            {
+                try
+                {
+                    MAVLink.MAVLinkMessage message = localParser.ReadPacket(ctx.Stream);
 
+                    if (message == null || message.data == null)
+                        continue;
+                    // Handle messages from sysid=1 (ardupilot cube) or any autopilot
+                    if (message.sysid == ctx.SysId || message.sysid == 1 || ctx.SysId == 0)
+                    {
+                        // Delegate handling to the per-connection message handler
+                        ctx.Handler.HandleMavlinkMessage(message);
+                    }
+                    // Handle messages from sysid=10 (CO2 sensors) remain global
+                    else if (message.sysid == 10)
+                    {
+                        HandleSensorMessage(message);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error handling MAVLink message on {ctx?.ConnectionId}: {ex.Message}");
+                    break;
+                }
+            }
+        }
 
-
+        // Legacy stream-based handler (kept for compatibility if used elsewhere)
         private void HandleMavlinkMessages(Stream stream)
         {
-            MAVLink.MavlinkParse mavlink = new MAVLink.MavlinkParse();
+            MAVLink.MavlinkParse localParser = new MAVLink.MavlinkParse();
 
             while (true)
             {
                 try
                 {
-                    MAVLink.MAVLinkMessage message = mavlink.ReadPacket(stream);
+                    MAVLink.MAVLinkMessage message = localParser.ReadPacket(stream);
 
                     if (message == null || message.data == null)
                         continue;
@@ -1273,22 +1432,40 @@ namespace IERAX_MissionControl
 
         private void UpdateDroneMarker(PointLatLng position)
         {
+            // Legacy: route to active connection
+            var id = _activeConnectionId ?? _connections.Keys.FirstOrDefault();
+            if (id == null)
+                return;
+            UpdateDroneMarkerForConnection(id, position);
+        }
+
+        private void UpdateDroneMarkerForConnection(string connectionId, PointLatLng position)
+        {
             if (this.InvokeRequired)
             {
-                this.Invoke(new Action<PointLatLng>(UpdateDroneMarker), position);
+                this.Invoke(new Action<string, PointLatLng>(UpdateDroneMarkerForConnection), connectionId, position);
             }
             else
             {
-                if (droneMarker == null)
+                if (string.IsNullOrEmpty(connectionId) || !_connections.TryGetValue(connectionId, out var ctx))
                 {
-                    // Create the drone marker if it doesn't exist
-                    droneMarker = new DroneMarker(position, mavlinkMessageHandler);
-                    markersOverlay.Markers.Add(droneMarker);
+                    return;
+                }
+
+                if (ctx.Marker == null)
+                {
+                    ctx.Marker = new DroneMarker(position, ctx.Handler);
+                    markersOverlay.Markers.Add(ctx.Marker);
                 }
                 else
                 {
-                    // Update the position of the existing drone marker
-                    droneMarker.Position = position;
+                    ctx.Marker.Position = position;
+                }
+
+                // Keep legacy global field pointing to active marker for backward compatibility
+                if (_activeConnectionId == connectionId)
+                {
+                    droneMarker = ctx.Marker;
                 }
 
                 // Optionally, refresh the overlay to ensure the marker is rendered correctly
@@ -1355,8 +1532,12 @@ namespace IERAX_MissionControl
         //EDO EXOUME TON ASYNC WORKER
         void bgw_DoWork(object sender, DoWorkEventArgs e)
         {
-
-            HandleMavlinkMessages(serialPort1.BaseStream);
+            // Find a serial connection context and start message handling
+            var ctx = _connections.Values.FirstOrDefault(c => !c.IsTcp);
+            if (ctx != null)
+            {
+                HandleMavlinkMessages(ctx);
+            }
         }
 
         T readsomedata<T>(byte sysid, byte compid, int timeout = 2000)
@@ -1557,7 +1738,8 @@ namespace IERAX_MissionControl
                 }
 
                 // Update the drone marker's position
-                droneMarker.Position = point;
+                if (droneMarker != null)
+                    droneMarker.Position = point;
 
                 // Refresh the overlay to ensure the marker is rendered on top
                 markersOverlay.IsVisibile = true;
@@ -2012,11 +2194,13 @@ namespace IERAX_MissionControl
 
         private void SendPacket(byte[] packet)
         {
-            if (isTcpConnection && tcpStream != null)
+            // Send via active connection by default
+            var ctx = GetActiveConnection();
+            if (ctx != null && ctx.IsTcp && ctx.Stream != null)
             {
-                tcpStream.Write(packet, 0, packet.Length);
-                tcpStream.Flush();
-                Console.WriteLine("Packet sent via TCP.");
+                ctx.Stream.Write(packet, 0, packet.Length);
+                ctx.Stream.Flush();
+                Console.WriteLine($"Packet sent via TCP to {ctx.ConnectionId}.");
             }
             else if (!isTcpConnection && serialPort1.IsOpen)
             {
@@ -2332,30 +2516,49 @@ namespace IERAX_MissionControl
 
             // Calculate the ship's future position
             double deltaLat = (distance / 6371000.0) * Math.Cos(headingRad); // Earth's radius in meters
-            double deltaLng = (distance / 6371000.0) * Math.Sin(headingRad) / Math.Cos(shipPosition.Lat * (Math.PI / 180));
+            double deltaLon = (distance / 6371000.0) * Math.Sin(headingRad) / Math.Cos(shipPosition.Lat * (Math.PI / 180));
 
             double futureLat = shipPosition.Lat + (deltaLat * (180 / Math.PI));
-            double futureLng = shipPosition.Lng + (deltaLng * (180 / Math.PI));
+            double futureLon = shipPosition.Lng + (deltaLon * (180 / Math.PI));
 
-            return new PointLatLng(futureLat, futureLng);
+            return new PointLatLng(futureLat, futureLon);
         }
 
         private PointLatLng GetDroneCurrentPosition()
         {
-            PointLatLng currentPosition = mavlinkMessageHandler.DroneCurrentPosition;
-            return currentPosition;
+            var ctx = GetActiveConnection();
+            if (ctx != null && ctx.Handler != null)
+            {
+                PointLatLng currentPosition = ctx.Handler.DroneCurrentPosition;
+                return currentPosition;
+            }
+            // fallback to legacy
+            PointLatLng legacy = mavlinkMessageHandler != null ? mavlinkMessageHandler.DroneCurrentPosition : new PointLatLng(0, 0);
+            return legacy;
         }
 
         private Double GetDroneGroundSpeed()
         {
-           Double currentSpeed = mavlinkMessageHandler.DroneGroundSpeed;
-            return currentSpeed;
+           var ctx = GetActiveConnection();
+           if (ctx != null && ctx.Handler != null)
+           {
+               Double currentSpeed = ctx.Handler.DroneGroundSpeed;
+               return currentSpeed;
+           }
+           Double legacy = mavlinkMessageHandler != null ? mavlinkMessageHandler.DroneGroundSpeed : 0.0;
+           return legacy;
         }
 
         private Double GetDroneCurrentHeading()
             {
-            Double currentHeading = mavlinkMessageHandler.DroneHeading;
-            return currentHeading;
+            var ctx = GetActiveConnection();
+            if (ctx != null && ctx.Handler != null)
+            {
+                Double currentHeading = ctx.Handler.DroneHeading;
+                return currentHeading;
+            }
+            Double legacy = mavlinkMessageHandler != null ? mavlinkMessageHandler.DroneHeading : 0.0;
+            return legacy;
         }
 
 
@@ -2366,11 +2569,11 @@ namespace IERAX_MissionControl
             double lat1 = point1.Lat * (Math.PI / 180);
             double lat2 = point2.Lat * (Math.PI / 180);
             double deltaLat = (point2.Lat - point1.Lat) * (Math.PI / 180);
-            double deltaLng = (point2.Lng - point1.Lng) * (Math.PI / 180);
+            double deltaLon = (point2.Lng - point1.Lng) * (Math.PI / 180);
 
             double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
                        Math.Cos(lat1) * Math.Cos(lat2) *
-                       Math.Sin(deltaLng / 2) * Math.Sin(deltaLng / 2);
+                       Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
 
             double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
@@ -2510,9 +2713,9 @@ namespace IERAX_MissionControl
         private static (double x, double y) LatLonToENU(PointLatLng point, PointLatLng reference)
         {
             double dLat = DegreesToRadians(point.Lat - reference.Lat);
-            double dLng = DegreesToRadians(point.Lng - reference.Lng);
+            double dLon = DegreesToRadians(point.Lng - reference.Lng);
 
-            double x = EarthRadius * dLng * Math.Cos(DegreesToRadians(reference.Lat)); // East
+            double x = EarthRadius * dLon * Math.Cos(DegreesToRadians(reference.Lat)); // East
             double y = EarthRadius * dLat; // North
 
             return (x, y);
@@ -2521,10 +2724,10 @@ namespace IERAX_MissionControl
         private static PointLatLng ENUToLatLng(double x, double y, PointLatLng reference)
         {
             double dLat = y / EarthRadius;
-            double dLng = x / (EarthRadius * Math.Cos(DegreesToRadians(reference.Lat)));
+            double dLon = x / (EarthRadius * Math.Cos(DegreesToRadians(reference.Lat)));
 
             double lat = reference.Lat + RadiansToDegrees(dLat);
-            double lng = reference.Lng + RadiansToDegrees(dLng);
+            double lng = reference.Lng + RadiansToDegrees(dLon);
 
             return new PointLatLng(lat, lng);
         }
@@ -2719,16 +2922,20 @@ namespace IERAX_MissionControl
             double earthRadius = 6378137; // in meters (WGS84)
             double bearingRad = bearingDegrees * Math.PI / 180.0;
             double latRad = origin.Lat * Math.PI / 180.0;
-            double lngRad = origin.Lng * Math.PI / 180.0;
+            double lonRad = origin.Lng * Math.PI / 180.0;
 
-            double newLatRad = Math.Asin(Math.Sin(latRad) * Math.Cos(distance / earthRadius) +
-                                         Math.Cos(latRad) * Math.Sin(distance / earthRadius) * Math.Cos(bearingRad));
-            double newLngRad = lngRad + Math.Atan2(Math.Sin(bearingRad) * Math.Sin(distance / earthRadius) * Math.Cos(latRad),
-                                                   Math.Cos(distance / earthRadius) - Math.Sin(latRad) * Math.Sin(newLatRad));
+            double angularDistance = distance / earthRadius;
+
+            double newLatRad = Math.Asin(Math.Sin(latRad) * Math.Cos(angularDistance) +
+                                         Math.Cos(latRad) * Math.Sin(angularDistance) * Math.Cos(bearingRad));
+
+            double newLonRad = lonRad + Math.Atan2(Math.Sin(bearingRad) * Math.Sin(angularDistance) * Math.Cos(latRad),
+                                                   Math.Cos(angularDistance) - Math.Sin(latRad) * Math.Sin(newLatRad));
 
             double newLat = newLatRad * 180.0 / Math.PI;
-            double newLng = newLngRad * 180.0 / Math.PI;
-            return new PointLatLng(newLat, newLng);
+            double newLon = newLonRad * 180.0 / Math.PI;
+
+            return new PointLatLng(newLat, newLon);
         }
 
 
