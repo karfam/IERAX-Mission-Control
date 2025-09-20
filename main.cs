@@ -264,6 +264,14 @@ namespace IERAX_MissionControl
 
             // Wire up the LandButton click event
             this.LandButton.Click += new System.EventHandler(this.LandButton_Click);
+
+            // Rewire main Connect button to open the Connections window
+            try
+            {
+                this.but_connect.Click -= new System.EventHandler(this.but_connect_Click);
+                this.but_connect.Click += new System.EventHandler(this.OpenConnectionsWindow_Click);
+            }
+            catch { /* ignore if not wired yet */ }
         }
 
         private class EqEvent
@@ -698,25 +706,44 @@ namespace IERAX_MissionControl
             }
         }
 
-        private void but_connect_Click(object sender, EventArgs e)
+        // Opens the connections window instead of directly connecting
+        private void OpenConnectionsWindow_Click(object sender, EventArgs e)
         {
-            string selectedConnection = CMB_comport.Text;
+            using (var dlg = new ConnectionsForm(this))
+            {
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.ShowDialog(this);
+            }
+        }
+
+        // Legacy direct connect method kept for programmatic use
+        public async Task<bool> TryConnectToAsync(string selectedConnection)
+        {
+            if (string.IsNullOrWhiteSpace(selectedConnection))
+                return false;
 
             try
             {
+                // Also reflect selection in the existing combo, for backward-compat with existing code
+                if (CMB_comport.InvokeRequired)
+                    CMB_comport.Invoke(new Action(() => CMB_comport.Text = selectedConnection));
+                else
+                    CMB_comport.Text = selectedConnection;
+
                 if (selectedConnection.Contains(":")) // TCP Connection Handling
                 {
                     if (isConnected)
                     {
                         DisconnectTCP();
+                        return false;
                     }
                     else
                     {
                         string[] parts = selectedConnection.Split(':');
                         string ip = parts[0];
                         int port = int.Parse(parts[1]);
-
-                        ConnectViaTCP(ip, port);
+                        var ok = await ConnectViaTCP(ip, port);
+                        return ok;
                     }
                 }
                 else // Serial Port Connection Handling
@@ -724,10 +751,12 @@ namespace IERAX_MissionControl
                     if (serialPort1.IsOpen)
                     {
                         DisconnectSerial();
+                        return false;
                     }
                     else
                     {
-                        ConnectSerial(selectedConnection);
+                        var ok = ConnectSerial(selectedConnection);
+                        return ok;
                     }
                 }
             }
@@ -735,28 +764,47 @@ namespace IERAX_MissionControl
             {
                 MessageBox.Show($"Error: {ex.Message}", "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 ResetConnectButton(); // Reset button in case of failure
+                return false;
             }
         }
 
-        // Function to connect via Serial
-        private void ConnectSerial(string portName)
+        private void but_connect_Click(object sender, EventArgs e)
         {
-            serialPort1.PortName = portName;
-            serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
-            serialPort1.Open();
-            serialPort1.ReadTimeout = 2000;
+            // Old behavior replaced by a connections window. Kept here for compatibility if called elsewhere.
+            OpenConnectionsWindow_Click(sender, e);
+        }
 
-            this.Invoke(new Action(() =>
+        // Function to connect via Serial
+        private bool ConnectSerial(string portName)
+        {
+            try
             {
-                but_connect.Text = "Disconnect";
-                but_connect.BackColor = Color.Green;
-                but_connect.ForeColor = Color.White;
-            }));
+                serialPort1.PortName = portName;
+                serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+                serialPort1.Open();
+                serialPort1.ReadTimeout = 2000;
 
-            // Start background worker to handle connection
-            BackgroundWorker bgw = new BackgroundWorker();
-            bgw.DoWork += bgw_DoWork;
-            bgw.RunWorkerAsync();
+                this.Invoke(new Action(() =>
+                {
+                    but_connect.Text = "Disconnect";
+                    but_connect.BackColor = Color.Green;
+                    but_connect.ForeColor = Color.White;
+                }));
+
+                // Start background worker to handle connection
+                BackgroundWorker bgw = new BackgroundWorker();
+                bgw.DoWork += bgw_DoWork;
+                bgw.RunWorkerAsync();
+
+                isTcpConnection = false;
+                isConnected = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Serial connect failed: {ex.Message}");
+                return false;
+            }
         }
 
         // Function to disconnect Serial
@@ -769,6 +817,7 @@ namespace IERAX_MissionControl
                 but_connect.Text = "Connect";
                 but_connect.BackColor = Color.Red;
                 but_connect.ForeColor = Color.White;
+                isConnected = false;
             }));
         }
 
@@ -799,7 +848,7 @@ namespace IERAX_MissionControl
 
 
 
-        private async Task ConnectViaTCP(string ip, int port)
+        private async Task<bool> ConnectViaTCP(string ip, int port)
         {
             try
             {
@@ -815,36 +864,33 @@ namespace IERAX_MissionControl
                     isConnected = true;
                 }));
 
-                Console.WriteLine($"✅ Connected to SITL at {ip}:5762");
+                Console.WriteLine($"✅ Connected to SITL at {ip}:{port}");
 
                 // Send heartbeat and wait for SYSID response
                 bool sysIdReceived = await SendMavlinkHeartbeatAsync();
                 if (!sysIdReceived)
                 {
                     Console.WriteLine("❌ Connection failed: No SYSID received.");
-                    return;
+                    return false;
                 }
                 await Task.Delay(1000);
 
-                // Request autopilot capabilities (Wakes up SITL)
-                  //RequestAutopilotCapabilities();
-                 // await Task.Delay(1000);
-
                 // Request system parameters
-              RequestParameters();
-               await Task.Delay(2000);
-
+                RequestParameters();
+                await Task.Delay(2000);
 
                 // Request telemetry data streams
                 RequestDataStream();
                 await Task.Delay(1000);
 
                 // Start handling MAVLink messages
-                await Task.Run(() => HandleMavlinkMessages(tcpStream));
+                _ = Task.Run(() => HandleMavlinkMessages(tcpStream));
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to connect to {ip}:{port} - {ex.Message}");
+                return false;
             }
         }
 
@@ -1396,18 +1442,27 @@ namespace IERAX_MissionControl
             PopulateConnectionList();
         }
 
-        private void PopulateConnectionList()
+        // Helper to get available connections list for reuse by UI dialogs
+        public List<string> GetAvailableConnections()
         {
-            // Get available serial ports
             var serialPorts = SerialPort.GetPortNames().ToList();
 
-            // Add the TCP connection option
+            // Add the TCP connection options
             serialPorts.Add("172.23.130.102:5760");
             serialPorts.Add("127.0.0.1:5760");
             serialPorts.Add("127.0.0.1:5762");
+            serialPorts.Add("127.0.0.1:5772");
+
+            return serialPorts;
+        }
+
+        private void PopulateConnectionList()
+        {
+            // Get available serial ports and TCP endpoints
+            var connections = GetAvailableConnections();
 
             // Set the DataSource of the ComboBox to the updated list
-            CMB_comport.DataSource = serialPorts;
+            CMB_comport.DataSource = connections;
 
             // Set default selection if needed
             if (CMB_comport.Items.Count > 0)
