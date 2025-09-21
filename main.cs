@@ -586,6 +586,12 @@ namespace IERAX_MissionControl
             if (ActiveDroneComboBox.SelectedItem is string id && _connections.ContainsKey(id))
             {
                 _activeConnectionId = id;
+                // Clear the projected path when active drone changes
+                if (markersOverlay != null)
+                {
+                    markersOverlay.Routes.Clear();
+                    gMapControl1?.Refresh();
+                }
             }
         }
 
@@ -1517,8 +1523,8 @@ namespace IERAX_MissionControl
                 // Get the drone's speed
                 double droneSpeedMps = GetDroneGroundSpeed();
 
-                // If speed is greater than 5 m/s, draw a straight green line 1000m ahead
-                if (droneSpeedMps > 5.0)
+                // If this is the active drone and speed is greater than 5 m/s, draw projected path
+                if (_activeConnectionId == connectionId && droneSpeedMps > 5.0)
                 {
                     DrawProjectedFlightPath(position, droneSpeedMps);
                 }
@@ -1893,8 +1899,7 @@ namespace IERAX_MissionControl
             // Show the context menu at the mouse position
             contextMenu.Show(gMapControl1, location);
         }
-
-       
+      
 
 
 
@@ -2607,10 +2612,10 @@ namespace IERAX_MissionControl
         private double GetDistance(PointLatLng point1, PointLatLng point2)
         {
             double R = 6371000; // Earth's radius in meters
-            double lat1 = point1.Lat * (Math.PI / 180);
-            double lat2 = point2.Lat * (Math.PI / 180);
-            double deltaLat = (point2.Lat - point1.Lat) * (Math.PI / 180);
-            double deltaLon = (point2.Lng - point1.Lng) * (Math.PI / 180);
+            double lat1 = point1.Lat * (Math.PI / 180.0);
+            double lat2 = point2.Lat * (Math.PI / 180.0);
+            double deltaLat = (point2.Lat - point1.Lat) * (Math.PI / 180.0);
+            double deltaLon = (point2.Lng - point1.Lng) * (Math.PI / 180.0);
 
             double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
                        Math.Cos(lat1) * Math.Cos(lat2) *
@@ -2833,10 +2838,10 @@ namespace IERAX_MissionControl
             double deltaLat = (offsetY / earthRadius) * (180 / Math.PI);
 
             // Calculate the change in longitude in degrees (adjusted for current latitude)
-            double deltaLng = (offsetX / earthRadius) * (180 / Math.PI) / Math.Cos(origin.Lat * Math.PI / 180);
+            double deltaLon = (offsetX / earthRadius) * (180 / Math.PI) / Math.Cos(origin.Lat * Math.PI / 180);
 
             // Return the new geographic coordinate
-            return new PointLatLng(origin.Lat + deltaLat, origin.Lng + deltaLng);
+            return new PointLatLng(origin.Lat + deltaLat, origin.Lng + deltaLon);
         }
 
 
@@ -3027,7 +3032,9 @@ namespace IERAX_MissionControl
             double dlon = lon2 - lon1;
 
             double a = Math.Pow(Math.Sin(dlat / 2), 2) +
-                       Math.Cos(lat1) * Math.Cos(lat2) * Math.Pow(Math.Sin(dlon / 2), 2);
+                       Math.Cos(lat1 * Math.PI / 180.0) *
+                       Math.Cos(lat2 * Math.PI / 180.0) *
+                       Math.Pow(Math.Sin(dlon / 2), 2);
             double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
             double earthRadius = 6371000.0; // meters
