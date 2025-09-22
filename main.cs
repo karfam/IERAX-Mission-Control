@@ -97,7 +97,22 @@ namespace IERAX_MissionControl
         private System.Windows.Forms.Timer droneNavigationTimer;
         private DroneFlightMode currentMode = DroneFlightMode.None;
 
+        private Task<bool> SetModeGuidedAsyncForActiveCtx() => SendDoSetModeAsync(4); // GUIDED
+        private Task<bool> SetModeAutoAsyncForActiveCtx() => SendDoSetModeAsync(3); // AUTO
+
+
         public enum Corner { NE, NW, SE, SW }
+
+        private readonly Dictionary<Corner, List<PointLatLng>> _quadrantPaths =
+         new Dictionary<Corner, List<PointLatLng>>();
+        private const float DEFAULT_ALT_AGL_M = 120f;        // adjust to your op limits
+        private const float CORNER_REACH_THRESH_M = 8f;      // how close is "at corner"
+        private const int NAV_POLL_MS = 500;
+        private readonly object _txLock = new object();
+        private bool? _armUiLast;
+        private DateTime _armUiLastChangeUtc = DateTime.MinValue;
+        private static readonly TimeSpan ArmUiMinDwell = TimeSpan.FromMilliseconds(400);
+
 
         // ================= MULTI-DRONE SUPPORT =================
         // Each connection/drone context tracked separately
@@ -108,12 +123,21 @@ namespace IERAX_MissionControl
             public TcpClient TcpClient { get; set; }
             public System.IO.Stream Stream { get; set; }
             public SerialPort SerialPort { get; set; }
-            public byte SysId { get; set; }
-            public byte CompId { get; set; }
+            // NEW: cache IDs from incoming MAVLink messages
+            public byte SysId { get; set; } = 0;
+            public byte CompId { get; set; } = 0;
             public MavlinkMessageHandler Handler { get; set; }
             public DroneMarker Marker { get; set; }
             public CancellationTokenSource Cts { get; set; }
             public bool IsConnected { get; set; }
+            public double LastRelAltMeters { get; set; } = double.NaN;
+            public DateTime LastRelAltTimeUtc { get; set; } = DateTime.MinValue;
+
+            // Last known flight status (from HEARTBEAT / handler)
+            public bool IsArmed { get; set; }
+            public bool? LastIsArmedFromHb { get; set; } // optional dedupe
+            public string LastModeName { get; set; }     // e.g., "GUIDED", "AUTO"
+            public DateTime LastHeartbeatUtc { get; set; } = DateTime.MinValue;
         }
 
         // All active drone connections by connectionId
@@ -121,6 +145,12 @@ namespace IERAX_MissionControl
         // Currently active/selected connection id (used by default in UI actions)
         private string _activeConnectionId;
         private int _connCounter = 0;
+
+        // Put in your class
+        private readonly object _ackLock = new object();
+        private readonly Dictionary<ushort, TaskCompletionSource<MAVLink.mavlink_command_ack_t>> _pendingAcks
+            = new Dictionary<ushort, TaskCompletionSource<MAVLink.mavlink_command_ack_t>>();
+
 
         private string GenerateConnectionId(string kind, string hint)
         {
@@ -146,8 +176,7 @@ namespace IERAX_MissionControl
             double quadSize = 1000;    // meters
             double laneSpacing = 250;  // meters
 
-            // Calculate quadrant centers
-            Dictionary<Corner, PointLatLng> quadCenters = new Dictionary<Corner, PointLatLng>
+            var quadCenters = new Dictionary<Corner, PointLatLng>
     {
         { Corner.NW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2,  quadSize/2) },
         { Corner.NE, ToLatLon(overallCenterLat, overallCenterLon,  quadSize/2,  quadSize/2) },
@@ -155,7 +184,6 @@ namespace IERAX_MissionControl
         { Corner.SW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2, -quadSize/2) }
     };
 
-            // Plan for each drone
             var pathAlpha = PlanFromCorner(new QuadrantPlan
             {
                 CenterLatDeg = quadCenters[Corner.NE].Lat,
@@ -196,9 +224,407 @@ namespace IERAX_MissionControl
                 StartCorner = Corner.NW
             });
 
-            // Draw them
+            // Cache by corner (so we can pick the correct one later)
+            _quadrantPaths[Corner.NE] = pathAlpha;
+            _quadrantPaths[Corner.SE] = pathBravo;
+            _quadrantPaths[Corner.SW] = pathCharlie;
+            _quadrantPaths[Corner.NW] = pathDelta;
+
+            // Your existing draw
             DrawAllQuadrantPlans(pathAlpha, pathBravo, pathCharlie, pathDelta);
         }
+
+
+       public async Task StartVolcanoHeatmapAsync()
+{
+    try
+    {
+        if (_quadrantPaths.Count == 0)
+            GenerateAndDrawQuadrantPaths();
+
+        // Validate active link
+        if (string.IsNullOrEmpty(_activeConnectionId) ||
+            !_connections.TryGetValue(_activeConnectionId, out var ctx) ||
+            !ctx.IsConnected || ctx.Stream == null || !ctx.Stream.CanWrite)
+        {
+            MessageBox.Show("No active MAVLink connection.", "Volcano Heatmap",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var dronePos = GetDroneCurrentPosition();
+        if (double.IsNaN(dronePos.Lat) || double.IsNaN(dronePos.Lng) ||
+            (Math.Abs(dronePos.Lat) < 1e-6 && Math.Abs(dronePos.Lng) < 1e-6))
+        {
+            MessageBox.Show("Active drone position not available.", "Volcano Heatmap",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        // Compute closest corner
+        double overallCenterLat = 36.4044;
+        double overallCenterLon = 25.3975;
+        double quadSize = 1000.0; // meters
+
+        var refs = new Dictionary<Corner, PointLatLng>
+        {
+            { Corner.NW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2,  quadSize/2) },
+            { Corner.NE, ToLatLon(overallCenterLat, overallCenterLon,  quadSize/2,  quadSize/2) },
+            { Corner.SE, ToLatLon(overallCenterLat, overallCenterLon,  quadSize/2, -quadSize/2) },
+            { Corner.SW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2, -quadSize/2) },
+        };
+
+        var chosenCorner = refs
+            .Select(kvp => new { kvp.Key, Dist = GetDistance(dronePos, kvp.Value) })
+            .OrderBy(x => x.Dist)
+            .First().Key;
+
+        if (!_quadrantPaths.TryGetValue(chosenCorner, out var chosenPath) ||
+            chosenPath == null || chosenPath.Count == 0)
+        {
+            MessageBox.Show($"No path cached for {chosenCorner}.", "Volcano Heatmap",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var startWp = chosenPath[0];
+
+        // Ensure GUIDED + armed
+        await SendDoSetModeAsync(4); // GUIDED
+        await WaitUntilModeIsAsync("GUIDED", 3000);
+
+        if (!ctx.IsArmed)
+        {
+            await ArmIfNeededAsyncForActiveCtx(true);
+            await WaitUntilArmedAsync(true, 6000);
+        }
+
+        // Takeoff if on ground
+        double relAlt = GetLastRelativeAltitudeMeters();
+        if (double.IsNaN(relAlt) || relAlt < 2.0)
+        {
+            var okTo = await GuidedTakeoffAsync(altRelM: 15f);
+            if (!okTo) { Console.WriteLine("Aborting: takeoff failed."); return; }
+        }
+
+        // Fly to start corner using streaming set-position
+        bool reached = await FlyGuidedToAsyncStreaming(
+            startWp.Lat, startWp.Lng, altRelM: 120f, stopMeters: 5, hz: 3, timeoutSec: 90);
+
+        if (!reached)
+            Console.WriteLine("WARN: did not reach start corner within timeout; continuing to upload mission.");
+
+        // Upload mission and start AUTO
+        await UploadMissionAsyncForActiveCtx(chosenPath, altRelMeters: 120f);
+        await StartMissionAsyncForActiveCtx(startIndex: 0);
+        await SetModeAutoAsyncForActiveCtx();
+        await WaitUntilModeIsAsync("AUTO", 3000);
+
+        MessageBox.Show($"Starting heatmap from {chosenCorner} corner.", "Volcano Heatmap",
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show($"Failed to start volcano heatmap: {ex.Message}", "Error",
+            MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+}
+
+
+        private double GetLastRelativeAltitudeMeters()
+        {
+            var ctx = GetActiveConnection();
+            if (ctx == null) return double.NaN;
+
+            // If we never got any altitude
+            if (ctx.LastRelAltTimeUtc == DateTime.MinValue)
+                return double.NaN;
+
+            // Reject values older than 5 seconds
+            if ((DateTime.UtcNow - ctx.LastRelAltTimeUtc).TotalSeconds > 5.0)
+                return double.NaN;
+
+            return ctx.LastRelAltMeters;
+        }
+
+        private DroneConnectionContext GetActiveCtxOrNull()
+        {
+            if (string.IsNullOrEmpty(_activeConnectionId)) return null;
+            return _connections.TryGetValue(_activeConnectionId, out var ctx) ? ctx : null;
+        }
+
+        private bool IsCtxConnected(DroneConnectionContext ctx)
+        {
+            return ctx != null && ctx.IsConnected && ctx.Stream != null && ctx.Stream.CanWrite;
+        }
+
+        // ====================== Target IDs helpers (per active connection) ======================
+
+        private (byte sys, byte comp) GetActiveTargetIds()
+        {
+            if (string.IsNullOrEmpty(_activeConnectionId)) return (1, 1);
+
+            if (_connections.TryGetValue(_activeConnectionId, out var ctx) && ctx != null)
+            {
+                var sys = ctx.SysId != 0 ? ctx.SysId : (byte)1;
+                var comp = ctx.CompId != 0 ? ctx.CompId : (byte)1;
+                return (sys, comp);
+            }
+
+            return (1, 1);
+        }
+
+        
+        // ====================== SET MODE (GUIDED / AUTO) ======================
+        // ArduCopter custom modes: AUTO=3, GUIDED=4
+        // Use MAV_CMD_DO_SET_MODE with param1=MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, param2=custom_mode
+
+
+        private async Task<bool> SendDoSetModeAsync(uint customMode)
+        {
+            var (sys, comp) = GetActiveTargetIds();
+
+            var cmd = new MAVLink.mavlink_command_long_t
+            {
+                target_system = sys,
+                target_component = comp,
+                command = (ushort)MAVLink.MAV_CMD.DO_SET_MODE, // 176
+                param1 = 1f, // MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
+                param2 = customMode
+            };
+
+            var waiter = RegisterAckWaiter((ushort)MAVLink.MAV_CMD.DO_SET_MODE, timeoutMs: 3000);
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
+            SendPacket(pkt, $"SET_MODE custom={customMode}");
+
+            try
+            {
+                var ack = await waiter.Task;
+                Console.WriteLine($"SET_MODE ACK: {(MAVLink.MAV_RESULT)ack.result}");
+                return ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"SET_MODE ACK ERROR: {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<bool> ArmIfNeededAsyncForActiveCtx(bool arm = true)
+        {
+            var (sys, comp) = GetActiveTargetIds();
+
+            var cmd = new MAVLink.mavlink_command_long_t
+            {
+                target_system = sys,
+                target_component = comp,
+                command = (ushort)MAVLink.MAV_CMD.COMPONENT_ARM_DISARM, // 400
+                param1 = arm ? 1f : 0f
+            };
+
+            var waiter = RegisterAckWaiter((ushort)MAVLink.MAV_CMD.COMPONENT_ARM_DISARM, timeoutMs: 3000);
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
+            SendPacket(pkt, $"ARM={arm}");
+
+            try
+            {
+                var ack = await waiter.Task;
+                Console.WriteLine($"ARM ACK: {(MAVLink.MAV_RESULT)ack.result}");
+                return ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ARM ACK ERROR: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<bool> GuidedTakeoffAsync(float altRelM)
+        {
+            await SendDoSetModeAsync(4);
+            await WaitUntilModeIsAsync("GUIDED", 3000);
+
+            var armOk = await ArmIfNeededAsyncForActiveCtx(true);
+            var armed = await WaitUntilArmedAsync(true, 6000);
+            if (!armOk || !armed)
+            {
+                Console.WriteLine("TAKEOFF aborted: not armed.");
+                return false;
+            }
+
+            var (sys, comp) = GetActiveTargetIds();
+            var takeoff = new MAVLink.mavlink_command_long_t
+            {
+                target_system = sys,
+                target_component = comp,
+                command = (ushort)MAVLink.MAV_CMD.TAKEOFF, // 22
+                param7 = altRelM
+            };
+
+            var waiter = RegisterAckWaiter((ushort)MAVLink.MAV_CMD.TAKEOFF, 8000);
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, takeoff);
+            SendPacket(pkt, $"TAKEOFF {altRelM}m");
+
+            try
+            {
+                var ack = await waiter.Task;
+                Console.WriteLine($"TAKEOFF ACK: {(MAVLink.MAV_RESULT)ack.result}");
+                return ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TAKEOFF ACK ERROR: {ex.Message}");
+                return false;
+            }
+        }
+
+
+
+        public async Task<bool> GuidedGoto_RepositionAsync(double latDeg, double lonDeg, float altRelM, float accRadiusM = 3f)
+        {
+            var (sys, comp) = GetActiveTargetIds();
+            float mask = 1f + 2f; // change pos + alt
+
+            var cmd = new MAVLink.mavlink_command_long_t
+            {
+                target_system = sys,
+                target_component = comp,
+                command = (ushort)MAVLink.MAV_CMD.DO_REPOSITION, // 512
+                param1 = 0f,
+                param2 = mask,
+                param3 = accRadiusM,
+                param4 = float.NaN,
+                param5 = (float)latDeg,
+                param6 = (float)lonDeg,
+                param7 = altRelM
+            };
+
+            var waiter = RegisterAckWaiter((ushort)MAVLink.MAV_CMD.DO_REPOSITION, timeoutMs: 3000);
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
+            SendPacket(pkt, $"REPOSITION to {latDeg:F6},{lonDeg:F6}@{altRelM:F1}m");
+
+            try
+            {
+                var ack = await waiter.Task;
+                Console.WriteLine($"REPOSITION ACK: {(MAVLink.MAV_RESULT)ack.result}");
+                return ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"REPOSITION ACK ERROR: {ex.Message}");
+                return false;
+            }
+        }
+
+
+ 
+
+        public void GuidedGoto_DO_REPOSITION(double latDeg, double lonDeg, float altRelMeters,
+                                             float acceptRadiusM = 3f, float yawDeg = float.NaN)
+        {
+            var (sys, comp) = GetActiveTargetIds();
+
+            // param2 bitmask: 1=change pos, 2=change alt, 4=change yaw
+            float mask = 1f + 2f + (float.IsNaN(yawDeg) ? 0f : 4f);
+
+            var cmd = new MAVLink.mavlink_command_long_t
+            {
+                target_system = sys,
+                target_component = comp,
+                command = (ushort)MAVLink.MAV_CMD.DO_REPOSITION, // 512
+                confirmation = 0,
+                param1 = 0f,                 // ground speed m/s (0 = unchanged)
+                param2 = mask,               // what to change
+                param3 = acceptRadiusM,      // acceptance radius
+                param4 = yawDeg,             // yaw deg (NaN ignored)
+                param5 = (float)latDeg,      // lat
+                param6 = (float)lonDeg,      // lon
+                param7 = altRelMeters        // alt (relative)
+            };
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
+            SendPacket(pkt);
+        }
+
+        // Optional: poll until close enough
+        private async Task WaitUntilNearAsync(PointLatLng target, double meters = 5, int pollMs = 500, int timeoutSec = 45)
+        {
+            var stop = DateTime.UtcNow.AddSeconds(timeoutSec);
+            while (DateTime.UtcNow < stop)
+            {
+                var pos = GetDroneCurrentPosition();
+                if (GetDistance(pos, target) <= meters) return;
+                await Task.Delay(pollMs);
+            }
+        }
+
+        // ====================== Mission upload & start (proper handshake) ======================
+
+        private async Task UploadMissionAsyncForActiveCtx(IReadOnlyList<PointLatLng> wps, float altRelMeters)
+        {
+            var (sys, comp) = GetActiveTargetIds();
+
+            // 1) Send MISSION_COUNT
+            var count = new MAVLink.mavlink_mission_count_t
+            {
+                target_system = sys,
+                target_component = comp,
+                count = (ushort)wps.Count,
+                mission_type = (byte)MAVLink.MAV_MISSION_TYPE.MISSION
+            };
+            SendPacket(mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.MISSION_COUNT, count));
+            await Task.Delay(100);
+
+            // 2) Send items as MISSION_ITEM_INT (GLOBAL_RELATIVE_ALT_INT)
+            for (ushort i = 0; i < wps.Count; i++)
+            {
+                var p = wps[i];
+                var item = new MAVLink.mavlink_mission_item_int_t
+                {
+                    target_system = sys,
+                    target_component = comp,
+                    seq = i,
+                    frame = (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT_INT,
+                    command = (ushort)MAVLink.MAV_CMD.WAYPOINT, // NAV_WAYPOINT
+                    current = (byte)(i == 0 ? 1 : 0),
+                    autocontinue = 1,
+                    param1 = 0,            // hold time
+                    param2 = 3,            // acceptance radius (m)
+                    param3 = 0,            // pass-through
+                    param4 = float.NaN,    // yaw (NaN = default)
+                    x = (int)Math.Round(p.Lat * 1e7),
+                    y = (int)Math.Round(p.Lng * 1e7),
+                    z = altRelMeters,
+                    mission_type = (byte)MAVLink.MAV_MISSION_TYPE.MISSION
+                };
+                SendPacket(mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.MISSION_ITEM_INT, item));
+                await Task.Delay(50);
+            }
+
+            // (Optionally wait for MISSION_ACK here if you handle incoming acks)
+            await Task.Delay(150);
+        }
+
+        private async Task StartMissionAsyncForActiveCtx(int startIndex = 0)
+        {
+            var (sys, comp) = GetActiveTargetIds();
+
+            // Option A: MAV_CMD_MISSION_START
+            var cmd = new MAVLink.mavlink_command_long_t
+            {
+                target_system = sys,
+                target_component = comp,
+                command = (ushort)MAVLink.MAV_CMD.MISSION_START, // 300
+                param1 = startIndex,
+                param2 = 0, // end index (0 = last)
+                confirmation = 0
+            };
+            SendPacket(mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd));
+            await Task.Delay(150);
+
+            // Ensure AUTO mode
+            await SetModeAutoAsyncForActiveCtx();
+        }
+
 
         private void DrawAllQuadrantPlans(
       List<PointLatLng> pathNE,
@@ -862,7 +1288,8 @@ namespace IERAX_MissionControl
             try
             {
                 serialPort1.PortName = portName;
-                serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+                //serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
+                serialPort1.BaudRate = 9600;
                 serialPort1.Open();
                 serialPort1.ReadTimeout = 2000;
 
@@ -979,7 +1406,6 @@ namespace IERAX_MissionControl
                 var client = new TcpClient(ip, port);
                 var stream = client.GetStream();
 
-                // Create connection context
                 string id = GenerateConnectionId("tcp", $"{ip}:{port}");
                 var ctx = new DroneConnectionContext
                 {
@@ -988,28 +1414,52 @@ namespace IERAX_MissionControl
                     TcpClient = client,
                     Stream = stream,
                     Cts = new CancellationTokenSource(),
-                    IsConnected = true
+                    IsConnected = true,
+
+                    // sensible defaults
+                    SysId = 1,
+                    CompId = 1,
+                    LastRelAltMeters = double.NaN,
+                    LastRelAltTimeUtc = DateTime.MinValue,
+                    LastHeartbeatUtc = DateTime.MinValue
                 };
 
-                // Create a per-connection MAVLink message handler with captured id
+                // Per-connection handler:
+                //   - ONLY position goes to UI
+                //   - arm/mode/alt just update context; UI is driven centrally from receiver
                 ctx.Handler = new MavlinkMessageHandler(
-                    pos => UpdateDroneMarkerForConnection(id, pos),
-                    isArmed => { if (_activeConnectionId == id) UpdateArmStatusBox(isArmed); },
-                    alt => { if (_activeConnectionId == id) UpdateAltimeterBox(alt); },
-                    mode => { if (_activeConnectionId == id) UpdateDroneModeTextBox(mode); },
-                    (name, val) => { if (_activeConnectionId == id) UpdateTextLabelGUI(name, val); });
+                     pos => UpdateDroneMarkerForConnection(id, pos),
 
-                // Create marker for this drone (initial position arbitrary; will be updated on first GPS msg)
+                     // Arm state: store only (UI will be updated centrally/debounced if you prefer)
+                     isArmed => { ctx.IsArmed = isArmed; ctx.LastIsArmedFromHb = isArmed; },
+
+                     // Altitude cache
+                     altM => { ctx.LastRelAltMeters = altM; ctx.LastRelAltTimeUtc = DateTime.UtcNow; },
+
+                     // Mode name string (no uint pattern matching)
+                     modeName =>
+                     {
+                         ctx.LastModeName = modeName;
+                         // If you still want immediate UI update for the active drone:
+                         if (_activeConnectionId == id) UpdateDroneModeTextBox(modeName);
+                     },
+
+                     (name, val) =>
+                     {
+                         if (_activeConnectionId == id) UpdateTextLabelGUI(name, val);
+                     });
+
+                // Create marker; position will be updated on first GPS msg
                 var initialPos = new PointLatLng(36.415797, 25.427891);
                 ctx.Marker = new DroneMarker(initialPos, ctx.Handler);
                 markersOverlay.Markers.Add(ctx.Marker);
 
                 _connections[id] = ctx;
-                // set active if none selected yet
+
                 if (string.IsNullOrEmpty(_activeConnectionId))
                     _activeConnectionId = id;
 
-                // Keep legacy fields in sync with the currently active connection
+                // Legacy fields (if you still need them)
                 tcpStream = stream;
                 isTcpConnection = true;
                 isConnected = true;
@@ -1019,13 +1469,12 @@ namespace IERAX_MissionControl
                     but_connect.Text = "Connected";
                     but_connect.BackColor = Color.Green;
                     but_connect.ForeColor = Color.White;
-                    // update active drones dropdown
                     RefreshActiveDroneComboItems();
                 }));
 
                 Console.WriteLine($"✅ Connected to SITL at {ip}:{port} (id={id})");
 
-                // Send heartbeat and wait for SYSID response
+                // Handshake & telemetry
                 bool sysIdReceived = await SendMavlinkHeartbeatAsync(ctx);
                 if (!sysIdReceived)
                 {
@@ -1034,15 +1483,12 @@ namespace IERAX_MissionControl
                 }
                 await Task.Delay(1000);
 
-                // Request system parameters
                 RequestParameters(ctx);
                 await Task.Delay(2000);
 
-                // Request telemetry data streams
                 RequestDataStream(ctx);
                 await Task.Delay(1000);
 
-                // Start handling MAVLink messages for this connection
                 _ = Task.Run(() => HandleMavlinkMessages(ctx));
                 return true;
             }
@@ -1052,6 +1498,34 @@ namespace IERAX_MissionControl
                 return false;
             }
         }
+
+        private async Task<bool> WaitUntilModeIsAsync(string expectedName, int timeoutMs = 3000)
+        {
+            var ctx = GetActiveConnection(); if (ctx == null) return false;
+            var end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < end)
+            {
+                if (!string.IsNullOrEmpty(ctx.LastModeName) &&
+                    string.Equals(ctx.LastModeName, expectedName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                await Task.Delay(100);
+            }
+            return false;
+        }
+
+        private async Task<bool> WaitUntilArmedAsync(bool desired, int timeoutMs = 5000)
+        {
+            var ctx = GetActiveConnection(); if (ctx == null) return false;
+            var end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < end)
+            {
+                if (ctx.IsArmed == desired) return true;
+                await Task.Delay(100);
+            }
+            return false;
+        }
+
 
         private async Task<bool> SendMavlinkHeartbeatAsync(DroneConnectionContext ctx)
         {
@@ -1301,26 +1775,117 @@ namespace IERAX_MissionControl
 
         private void HandleMavlinkMessages(DroneConnectionContext ctx)
         {
-            MAVLink.MavlinkParse localParser = new MAVLink.MavlinkParse();
+            if (ctx == null || ctx.Stream == null) return;
 
-            while (ctx != null && ctx.IsConnected)
+            var parser = new MAVLink.MavlinkParse();
+
+            while (ctx.IsConnected && ctx.Stream.CanRead && (ctx.Cts == null || !ctx.Cts.IsCancellationRequested))
             {
                 try
                 {
-                    MAVLink.MAVLinkMessage message = localParser.ReadPacket(ctx.Stream);
+                    MAVLink.MAVLinkMessage message = parser.ReadPacket(ctx.Stream);
+                    if (message == null || message.data == null) continue;
 
-                    if (message == null || message.data == null)
-                        continue;
-                    // Handle messages from sysid=1 (ardupilot cube) or any autopilot
-                    if (message.sysid == ctx.SysId || message.sysid == 1 || ctx.SysId == 0)
-                    {
-                        // Delegate handling to the per-connection message handler
-                        ctx.Handler.HandleMavlinkMessage(message);
-                    }
-                    // Handle messages from sysid=10 (CO2 sensors) remain global
-                    else if (message.sysid == 10)
+                    // --- SENSOR STREAM (sysid 10) stays global
+                    if (message.sysid == 10)
                     {
                         HandleSensorMessage(message);
+                        continue;
+                    }
+
+                    // --- Cache autopilot sys/comp on first HEARTBEAT only
+                    if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.HEARTBEAT)
+                    {
+                        var hb = (MAVLink.mavlink_heartbeat_t)message.data;
+
+                        // Ignore GCS heartbeats (sysid=255 or MAV_TYPE_GCS), but DO NOT return from the method
+                        bool isGcs = message.sysid == 255 ||
+                                     hb.type == (byte)MAVLink.MAV_TYPE.GCS;
+                        if (isGcs)
+                        {
+                            // Optional: Console.WriteLine("[HB] (GCS) ignored");
+                            continue; // <-- skip this message, keep the loop running
+                        }
+
+                        // Bind IDs ONCE when unknown (make sure ctx.SysId defaults to 0 at creation)
+                        if (ctx.SysId == 0)
+                        {
+                            ctx.SysId = message.sysid;
+                            ctx.CompId = message.compid;
+                            Console.WriteLine($"[HB] bind ctx {ctx.ConnectionId} -> SYSID={ctx.SysId} COMPID={ctx.CompId}");
+                        }
+
+                        // Only process arm state from the bound autopilot
+                        if (message.sysid == ctx.SysId)
+                        {
+                            bool isArmed = (hb.base_mode & (byte)MAVLink.MAV_MODE_FLAG.SAFETY_ARMED) != 0;
+                            ctx.IsArmed = isArmed;
+                            ctx.LastHeartbeatUtc = DateTime.UtcNow;
+
+                            if (ctx.LastIsArmedFromHb != isArmed)
+                            {
+                                ctx.LastIsArmedFromHb = isArmed;
+                                if (_activeConnectionId == ctx.ConnectionId)
+                                    UpdateArmStatusBox(isArmed);
+                            }
+
+                            Console.WriteLine($"[HB] sys={message.sysid} armed={isArmed} base_mode={hb.base_mode} custom_mode={hb.custom_mode}");
+                        }
+
+                        // Done with HEARTBEAT; move to next message
+                        continue;
+                    }
+
+
+                    // --- LOG position-ish messages to prove they're flowing
+                    if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.GLOBAL_POSITION_INT ||
+                        message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.GPS_RAW_INT)
+                    {
+                        try
+                        {
+                            if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.GLOBAL_POSITION_INT)
+                            {
+                                var gp = (MAVLink.mavlink_global_position_int_t)message.data;
+                      
+                                ctx.LastRelAltMeters = gp.relative_alt / 1000.0; // mm->m
+                                ctx.LastRelAltTimeUtc = DateTime.UtcNow;
+                                double lat = gp.lat / 1e7;
+                                double lon = gp.lon / 1e7;
+                                double alt = gp.relative_alt / 1000.0;
+                                double relAltM = gp.relative_alt / 1000.0; // mm -> m
+                  
+                                //Console.WriteLine($"[RX] GLOBAL_POSITION_INT sys={message.sysid} lat={lat:F6} lon={lon:F6} relAlt={alt:F1}m");
+                            }
+                            else
+                            {
+                                var gps = (MAVLink.mavlink_gps_raw_int_t)message.data;
+                                double lat = gps.lat / 1e7;
+                                double lon = gps.lon / 1e7;
+                                //Console.WriteLine($"[RX] GPS_RAW_INT sys={message.sysid} lat={lat:F6} lon={lon:F6} sat={gps.satellites_visible}");
+                            }
+                        }
+                        catch { /* swallow logging errors */ }
+                    }
+
+                    // --- Always deliver non-sensor messages to the connection's handler
+                    ctx.Handler?.HandleMavlinkMessage(message);
+
+                    // --- ACK/Mission diagnostics (keep these here too)
+                    if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.COMMAND_ACK)
+                    {
+                        var ack = (MAVLink.mavlink_command_ack_t)message.data;
+                        Console.WriteLine($"RX ACK cmd={ack.command} result={(MAVLink.MAV_RESULT)ack.result}");
+                        CompleteAck(ack.command, ack);
+                    }
+                    else if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.MISSION_REQUEST_INT)
+                    {
+                        var req = (MAVLink.mavlink_mission_request_int_t)message.data;
+                        Console.WriteLine($"RX MISSION_REQUEST_INT seq={req.seq}");
+                    }
+                    else if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.MISSION_ACK)
+                    {
+                        var mack = (MAVLink.mavlink_mission_ack_t)message.data;
+                        Console.WriteLine($"RX MISSION_ACK type={(MAVLink.MAV_MISSION_RESULT)mack.type}");
                     }
                 }
                 catch (Exception ex)
@@ -1331,39 +1896,7 @@ namespace IERAX_MissionControl
             }
         }
 
-        // Legacy stream-based handler (kept for compatibility if used elsewhere)
-        private void HandleMavlinkMessages(Stream stream)
-        {
-            MAVLink.MavlinkParse localParser = new MAVLink.MavlinkParse();
 
-            while (true)
-            {
-                try
-                {
-                    MAVLink.MAVLinkMessage message = localParser.ReadPacket(stream);
-
-                    if (message == null || message.data == null)
-                        continue;
-                    //Console.WriteLine($"Received MAVLink message: sysid={message.sysid}, msgid={message.msgid}, msgtypename={message.msgtypename}");
-                    // Handle messages from sysid=1 (ardupilot cube)
-                    if (message.sysid == 1)
-                    {
-                        // Delegate handling to the message handler
-                        mavlinkMessageHandler.HandleMavlinkMessage(message);
-                    }
-                    // Handle messages from sysid=10 (CO2 sensors)
-                    else if (message.sysid == 10)
-                    {
-                        HandleSensorMessage(message);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error handling MAVLink message: {ex.Message}");
-                    break;
-                }
-            }
-        }
 
 
         private void HandleSensorMessage(MAVLink.MAVLinkMessage message)
@@ -1478,17 +2011,11 @@ namespace IERAX_MissionControl
 
 
 
-        private void UpdateDroneMarker(PointLatLng position)
-        {
-            // Legacy: route to active connection
-            var id = _activeConnectionId ?? _connections.Keys.FirstOrDefault();
-            if (id == null)
-                return;
-            UpdateDroneMarkerForConnection(id, position);
-        }
-
         private void UpdateDroneMarkerForConnection(string connectionId, PointLatLng position)
         {
+
+           // Console.WriteLine($"[UI] Update marker for {connectionId} -> {position.Lat:F6},{position.Lng:F6}");
+
             if (this.InvokeRequired)
             {
                 this.Invoke(new Action<string, PointLatLng>(UpdateDroneMarkerForConnection), connectionId, position);
@@ -1572,21 +2099,16 @@ namespace IERAX_MissionControl
             return new PointLatLng(newLat, newLon);
         }
 
-
-
-
-
-
-        //EDO EXOUME TON ASYNC WORKER
-        void bgw_DoWork(object sender, DoWorkEventArgs e)
+        // NEW: Show distances from active drone to each quadrant reference (NW, NE, SE, SW)
+        public void startVolcanoHeatmap()
         {
-            // Find a serial connection context and start message handling
-            var ctx = _connections.Values.FirstOrDefault(c => !c.IsTcp);
-            if (ctx != null)
-            {
-                HandleMavlinkMessages(ctx);
-            }
+            _ = StartVolcanoHeatmapAsync();
         }
+
+
+
+
+
 
         T readsomedata<T>(byte sysid, byte compid, int timeout = 2000)
         {
@@ -1646,20 +2168,32 @@ namespace IERAX_MissionControl
 
         private void UpdateArmStatusBox(bool isArmed)
         {
-            if (ArmStatusBox.InvokeRequired)
-            {   
+            if (ArmStatusBox == null || ArmStatusBox.IsDisposed) return;
 
-                ArmStatusBox.Invoke(new Action(() =>
-                {
-                    ArmStatusBox.Text = isArmed ? "Armed" : "Disarmed";
-                    ArmStatusBox.BackColor = isArmed ? Color.Red : Color.Green;
-                }));
-            }
-            else
+            // Deduplicate + debounce UI repaints
+            var now = DateTime.UtcNow;
+            if (_armUiLast.HasValue && _armUiLast.Value == isArmed &&
+                (now - _armUiLastChangeUtc) < ArmUiMinDwell)
             {
-                ArmStatusBox.Text = isArmed ? "Armed" : "Disarmed";
-                ArmStatusBox.BackColor = isArmed ? Color.Red : Color.Green;
+                return;
             }
+            _armUiLast = isArmed;
+            _armUiLastChangeUtc = now;
+
+            void Apply()
+            {
+                // Optional: skip if text already matches (extra dedupe)
+                var newText = isArmed ? "Armed" : "Disarmed";
+                if (ArmStatusBox.Text == newText) return;
+
+                ArmStatusBox.Text = newText;
+                ArmStatusBox.BackColor = isArmed ? Color.Red : Color.Green; // keep your color scheme
+            }
+
+            if (ArmStatusBox.InvokeRequired)
+                ArmStatusBox.BeginInvoke((Action)Apply);
+            else
+                Apply();
         }
 
 
@@ -2234,31 +2768,99 @@ namespace IERAX_MissionControl
             return this.Controls.Find(labelName, true).FirstOrDefault() as Label;
         }
 
-
-
-
-
-        private void SendPacket(byte[] packet)
+        // --- ACK registry (keep what you have, add this helper) ---
+        private TaskCompletionSource<MAVLink.mavlink_command_ack_t> RegisterAckWaiter(ushort command, int timeoutMs = 2000)
         {
-            // Send via active connection by default
-            var ctx = GetActiveConnection();
-            if (ctx != null && ctx.IsTcp && ctx.Stream != null)
+            lock (_ackLock)
             {
-                ctx.Stream.Write(packet, 0, packet.Length);
-                ctx.Stream.Flush();
-                Console.WriteLine($"Packet sent via TCP to {ctx.ConnectionId}.");
-            }
-            else if (!isTcpConnection && serialPort1.IsOpen)
-            {
-                serialPort1.Write(packet, 0, packet.Length);
-                Console.WriteLine("Packet sent via Serial.");
-            }
-            else
-            {
-                Console.WriteLine("No valid connection available. Cannot send packet.");
+                if (_pendingAcks.TryGetValue(command, out var existing))
+                    return existing;
+
+                var tcs = new TaskCompletionSource<MAVLink.mavlink_command_ack_t>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _pendingAcks[command] = tcs;
+
+                var cts = new CancellationTokenSource(timeoutMs);
+                cts.Token.Register(() =>
+                {
+                    if (!tcs.Task.IsCompleted)
+                        tcs.TrySetException(new TimeoutException($"COMMAND_ACK timeout for cmd {command}"));
+                });
+                return tcs;
             }
         }
 
+
+
+
+
+
+        private void SendPacket(byte[] packet, string note = null)
+        {
+            try
+            {
+                var ctx = GetActiveConnection();
+                if (ctx != null && ctx.IsTcp && ctx.Stream != null && ctx.Stream.CanWrite)
+                {
+                    lock (_txLock)
+                    {
+                        ctx.Stream.Write(packet, 0, packet.Length);
+                        ctx.Stream.Flush();
+                    }
+                    byte msgid = (packet.Length > 6 && packet[0] == 0xFE) ? packet[5] : (byte)0xFF;
+                    Console.WriteLine($"TX [{ctx.ConnectionId}] msgid={msgid} len={packet.Length} {note ?? ""}");
+                }
+                else if (!isTcpConnection && serialPort1.IsOpen)
+                {
+                    lock (_txLock)
+                    {
+                        serialPort1.Write(packet, 0, packet.Length);
+                    }
+                    byte msgid = (packet.Length > 6 && packet[0] == 0xFE) ? packet[5] : (byte)0xFF;
+                    Console.WriteLine($"TX [Serial] msgid={msgid} len={packet.Length} {note ?? ""}");
+                }
+                else
+                {
+                    Console.WriteLine("TX FAIL: No valid connection available.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TX ERROR: {ex.Message}");
+            }
+        }
+
+        private Task<MAVLink.mavlink_command_ack_t> WaitForAckAsync(ushort command, int timeoutMs = 2000)
+        {
+            lock (_ackLock)
+            {
+                if (_pendingAcks.TryGetValue(command, out var existing))
+                    return existing.Task;
+
+                var tcs = new TaskCompletionSource<MAVLink.mavlink_command_ack_t>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _pendingAcks[command] = tcs;
+
+                // timeout
+                var cts = new CancellationTokenSource(timeoutMs);
+                cts.Token.Register(() =>
+                {
+                    if (!tcs.Task.IsCompleted)
+                        tcs.TrySetException(new TimeoutException($"COMMAND_ACK timeout for cmd {command}"));
+                });
+                return tcs.Task;
+            }
+        }
+
+        private void CompleteAck(ushort command, MAVLink.mavlink_command_ack_t ack)
+        {
+            lock (_ackLock)
+            {
+                if (_pendingAcks.TryGetValue(command, out var tcs))
+                {
+                    _pendingAcks.Remove(command);
+                    tcs.TrySetResult(ack);
+                }
+            }
+        }
 
 
         private void SendTakeoffCommand(float targetAltitude)
@@ -2353,6 +2955,113 @@ namespace IERAX_MissionControl
             SendPacket(packet);
             System.Threading.Thread.Sleep(100);  // Add a small delay if necessary
         }
+
+        private const ushort TYPE_MASK_POS_ONLY =
+         (1 << 3) | // vx
+         (1 << 4) | // vy
+         (1 << 5) | // vz
+         (1 << 6) | // ax
+         (1 << 7) | // ay
+         (1 << 8) | // az
+         (1 << 9) | // yaw
+         (1 << 10);  // yaw_rate
+
+        private byte _targetSystem = 1; // TODO: set from heartbeat
+        private byte _targetComp = 1; // TODO: set from heartbeat
+
+
+        private void SendSetPositionTargetGlobalInt(DroneConnectionContext ctx, double latDeg, double lonDeg, float altRelM)
+        {
+            var msg = new MAVLink.mavlink_set_position_target_global_int_t
+            {
+                time_boot_ms = 0,
+                target_system = ctx.SysId == 0 ? (byte)1 : ctx.SysId,
+                target_component = ctx.CompId == 0 ? (byte)1 : ctx.CompId,
+                coordinate_frame = (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT_INT,
+                type_mask = TYPE_MASK_POS_ONLY,
+                lat_int = (int)Math.Round(latDeg * 1e7),
+                lon_int = (int)Math.Round(lonDeg * 1e7),
+                alt = altRelM,
+                vx = 0,
+                vy = 0,
+                vz = 0,
+                afx = 0,
+                afy = 0,
+                afz = 0,
+                yaw = 0,
+                yaw_rate = 0
+            };
+
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.SET_POSITION_TARGET_GLOBAL_INT, msg);
+            SendPacket(pkt, $"SET_POSITION_TARGET_GLOBAL_INT -> {latDeg:F6},{lonDeg:F6}@{altRelM:F1}");
+        }
+
+        // Stream it until within 'stopMeters' of the target, or timeout
+        public async Task<bool> FlyGuidedToAsyncStreaming(double latDeg, double lonDeg, float altRelM,
+                                                          double stopMeters = 3, int hz = 3, int timeoutSec = 60)
+        {
+            // Ensure GUIDED & armed
+            await SendDoSetModeAsync(4);
+            await WaitUntilModeIsAsync("GUIDED", 3000);
+
+            if (!GetActiveConnection()?.IsArmed ?? true)
+            {
+                var armOk = await ArmIfNeededAsyncForActiveCtx(true);
+                var armed = await WaitUntilArmedAsync(true, 5000);
+                if (!armOk || !armed) return false;
+            }
+
+            // If still on ground, do a small takeoff first (e.g., 10 m)
+            var relAlt = GetLastRelativeAltitudeMeters();
+            if (double.IsNaN(relAlt) || relAlt < 2.0)
+            {
+                var toOk = await GuidedTakeoffAsync(altRelM: Math.Min(altRelM, 15f));
+                if (!toOk) return false;
+            }
+
+            int periodMs = (int)Math.Round(1000.0 / Math.Max(1, hz));
+            var end = DateTime.UtcNow.AddSeconds(timeoutSec);
+
+            while (DateTime.UtcNow < end)
+            {
+                SendSetPositionTargetGlobalInt(GetActiveConnection(), latDeg, lonDeg, altRelM);
+
+                var pos = GetDroneCurrentPosition(); // your existing helper (lat/lon)
+                var d = GetDistance(pos, new PointLatLng { Lat = latDeg, Lng = lonDeg });
+                if (d <= stopMeters) return true;
+
+                await Task.Delay(periodMs);
+            }
+            return false;
+        }
+
+        public void GuidedGoto_SET_POSITION_TARGET_GLOBAL_INT(double latDeg, double lonDeg, float altRelMeters)
+        {
+            var msg = new MAVLink.mavlink_set_position_target_global_int_t
+            {
+                time_boot_ms = 0, // autopilot will ignore
+                target_system = _targetSystem,
+                target_component = _targetComp,
+                coordinate_frame = (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT_INT,
+                type_mask = TYPE_MASK_POS_ONLY,
+                lat_int = (int)Math.Round(latDeg * 1e7),
+                lon_int = (int)Math.Round(lonDeg * 1e7),
+                alt = altRelMeters,
+                vx = 0,
+                vy = 0,
+                vz = 0,
+                afx = 0,
+                afy = 0,
+                afz = 0,
+                yaw = 0,
+                yaw_rate = 0
+            };
+
+            var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.SET_POSITION_TARGET_GLOBAL_INT, msg);
+            SendPacket(pkt);
+        }
+
+
 
         private void FlyToShip(ShipMarker shipMarker)
         {
@@ -3043,7 +3752,8 @@ namespace IERAX_MissionControl
 
         private void button1_Click_2(object sender, EventArgs e)
         {
-            StartShipMeasurementPattern();
+            startVolcanoHeatmap();
+            //StartShipMeasurementPattern();
             shipFollowingMode = false;
         }
 

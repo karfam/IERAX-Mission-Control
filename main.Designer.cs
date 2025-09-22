@@ -41,11 +41,10 @@
             this.but_mission = new System.Windows.Forms.Button();
             this.ShipFollowingModeLabel = new System.Windows.Forms.Label();
             this.but_connect = new System.Windows.Forms.Button();
-            this.cmb_baudrate = new System.Windows.Forms.ComboBox();
             this.CMB_comport = new System.Windows.Forms.ComboBox();
             this.TopPanel = new System.Windows.Forms.TableLayoutPanel();
-            this.ActiveDroneComboBox = new System.Windows.Forms.ComboBox();
             this.TakeOffButton = new System.Windows.Forms.Button();
+            this.ActiveDroneComboBox = new System.Windows.Forms.ComboBox();
             this.EarthquakeInfoLabel = new System.Windows.Forms.Label();
             this.LandButton = new System.Windows.Forms.Button();
             this.RTLButton = new System.Windows.Forms.Button();
@@ -105,8 +104,8 @@
             this.gMapControl1.GrayScaleMode = false;
             this.gMapControl1.HelperLineOption = GMap.NET.WindowsForms.HelperLineOptions.DontShow;
             this.gMapControl1.LevelsKeepInMemory = 5;
-            this.gMapControl1.Location = new System.Drawing.Point(0, 94);
-            this.gMapControl1.Margin = new System.Windows.Forms.Padding(4);
+            this.gMapControl1.Location = new System.Drawing.Point(0, 150);
+            this.gMapControl1.Margin = new System.Windows.Forms.Padding(6, 6, 6, 6);
             this.gMapControl1.MarkersEnabled = true;
             this.gMapControl1.MaxZoom = 2;
             this.gMapControl1.MinZoom = 2;
@@ -130,10 +129,10 @@
             this.AltHoldButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.AltHoldButton.Location = new System.Drawing.Point(295, 48);
-            this.AltHoldButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.AltHoldButton.Location = new System.Drawing.Point(469, 76);
+            this.AltHoldButton.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.AltHoldButton.Name = "AltHoldButton";
-            this.AltHoldButton.Size = new System.Drawing.Size(143, 36);
+            this.AltHoldButton.Size = new System.Drawing.Size(227, 58);
             this.AltHoldButton.TabIndex = 11;
             this.AltHoldButton.Text = "AltHold Mode";
             this.AltHoldButton.UseVisualStyleBackColor = true;
@@ -144,10 +143,10 @@
             this.GuidedModeButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.GuidedModeButton.Location = new System.Drawing.Point(295, 4);
-            this.GuidedModeButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.GuidedModeButton.Location = new System.Drawing.Point(469, 6);
+            this.GuidedModeButton.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.GuidedModeButton.Name = "GuidedModeButton";
-            this.GuidedModeButton.Size = new System.Drawing.Size(143, 36);
+            this.GuidedModeButton.Size = new System.Drawing.Size(227, 58);
             this.GuidedModeButton.TabIndex = 12;
             this.GuidedModeButton.Text = "Guided Mode";
             this.GuidedModeButton.UseVisualStyleBackColor = true;
@@ -158,10 +157,9 @@
             this.StopFollowingShipButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.StopFollowingShipButton.Location = new System.Drawing.Point(736, 46);
-            this.StopFollowingShipButton.Margin = new System.Windows.Forms.Padding(2);
+            this.StopFollowingShipButton.Location = new System.Drawing.Point(1168, 73);
             this.StopFollowingShipButton.Name = "StopFollowingShipButton";
-            this.StopFollowingShipButton.Size = new System.Drawing.Size(143, 40);
+            this.StopFollowingShipButton.Size = new System.Drawing.Size(227, 64);
             this.StopFollowingShipButton.TabIndex = 14;
             this.StopFollowingShipButton.Text = "Stop Following";
             this.StopFollowingShipButton.UseVisualStyleBackColor = true;
@@ -172,10 +170,10 @@
             this.GSpeedLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.GSpeedLabel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.GSpeedLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.GSpeedLabel.Location = new System.Drawing.Point(94, 49);
+            this.GSpeedLabel.Location = new System.Drawing.Point(150, 78);
             this.GSpeedLabel.Margin = new System.Windows.Forms.Padding(0);
             this.GSpeedLabel.Name = "GSpeedLabel";
-            this.GSpeedLabel.Size = new System.Drawing.Size(94, 54);
+            this.GSpeedLabel.Size = new System.Drawing.Size(150, 87);
             this.GSpeedLabel.TabIndex = 15;
             this.GSpeedLabel.Text = "Ground Speed";
             this.GSpeedLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -188,10 +186,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.ArmStatusBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.125F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ArmStatusBox.Location = new System.Drawing.Point(442, 46);
-            this.ArmStatusBox.Margin = new System.Windows.Forms.Padding(2);
+            this.ArmStatusBox.Location = new System.Drawing.Point(702, 73);
             this.ArmStatusBox.Name = "ArmStatusBox";
-            this.ArmStatusBox.Size = new System.Drawing.Size(143, 27);
+            this.ArmStatusBox.Size = new System.Drawing.Size(227, 38);
             this.ArmStatusBox.TabIndex = 6;
             this.ArmStatusBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.ArmStatusBox.TextChanged += new System.EventHandler(this.ArmStatusBox_TextChanged);
@@ -202,10 +199,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.but_armdisarm.BackColor = System.Drawing.Color.Yellow;
-            this.but_armdisarm.Location = new System.Drawing.Point(444, 4);
-            this.but_armdisarm.Margin = new System.Windows.Forms.Padding(4);
+            this.but_armdisarm.Location = new System.Drawing.Point(705, 6);
+            this.but_armdisarm.Margin = new System.Windows.Forms.Padding(6, 6, 6, 6);
             this.but_armdisarm.Name = "but_armdisarm";
-            this.but_armdisarm.Size = new System.Drawing.Size(139, 36);
+            this.but_armdisarm.Size = new System.Drawing.Size(221, 58);
             this.but_armdisarm.TabIndex = 3;
             this.but_armdisarm.Text = "Arm/Disarm";
             this.but_armdisarm.UseVisualStyleBackColor = false;
@@ -216,10 +213,10 @@
             this.but_mission.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_mission.Location = new System.Drawing.Point(150, 48);
-            this.but_mission.Margin = new System.Windows.Forms.Padding(4);
+            this.but_mission.Location = new System.Drawing.Point(239, 76);
+            this.but_mission.Margin = new System.Windows.Forms.Padding(6, 6, 6, 6);
             this.but_mission.Name = "but_mission";
-            this.but_mission.Size = new System.Drawing.Size(139, 36);
+            this.but_mission.Size = new System.Drawing.Size(221, 58);
             this.but_mission.TabIndex = 4;
             this.but_mission.Text = "Send Mission";
             this.but_mission.UseVisualStyleBackColor = true;
@@ -231,10 +228,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.ShipFollowingModeLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
-            this.ShipFollowingModeLabel.Location = new System.Drawing.Point(96, 358);
-            this.ShipFollowingModeLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.ShipFollowingModeLabel.Location = new System.Drawing.Point(153, 573);
             this.ShipFollowingModeLabel.Name = "ShipFollowingModeLabel";
-            this.ShipFollowingModeLabel.Size = new System.Drawing.Size(90, 54);
+            this.ShipFollowingModeLabel.Size = new System.Drawing.Size(144, 87);
             this.ShipFollowingModeLabel.TabIndex = 13;
             this.ShipFollowingModeLabel.Text = "Ship Following";
             this.ShipFollowingModeLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -244,36 +240,14 @@
             this.but_connect.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_connect.Location = new System.Drawing.Point(150, 4);
-            this.but_connect.Margin = new System.Windows.Forms.Padding(4);
+            this.but_connect.Location = new System.Drawing.Point(239, 6);
+            this.but_connect.Margin = new System.Windows.Forms.Padding(6, 6, 6, 6);
             this.but_connect.Name = "but_connect";
-            this.but_connect.Size = new System.Drawing.Size(139, 36);
+            this.but_connect.Size = new System.Drawing.Size(221, 58);
             this.but_connect.TabIndex = 2;
             this.but_connect.Text = "Connect";
             this.but_connect.UseVisualStyleBackColor = true;
             this.but_connect.Click += new System.EventHandler(this.but_connect_Click);
-            // 
-            // cmb_baudrate
-            // 
-            this.cmb_baudrate.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.cmb_baudrate.FormattingEnabled = true;
-            this.cmb_baudrate.ItemHeight = 16;
-            this.cmb_baudrate.Items.AddRange(new object[] {
-            "9600",
-            "14400",
-            "19200",
-            "28800",
-            "38400",
-            "57600",
-            "115200"});
-            this.cmb_baudrate.Location = new System.Drawing.Point(4, 48);
-            this.cmb_baudrate.Margin = new System.Windows.Forms.Padding(4);
-            this.cmb_baudrate.Name = "cmb_baudrate";
-            this.cmb_baudrate.Size = new System.Drawing.Size(138, 24);
-            this.cmb_baudrate.TabIndex = 1;
-            this.cmb_baudrate.SelectedIndexChanged += new System.EventHandler(this.cmb_baudrate_SelectedIndexChanged);
             // 
             // CMB_comport
             // 
@@ -281,10 +255,10 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.CMB_comport.FormattingEnabled = true;
-            this.CMB_comport.Location = new System.Drawing.Point(4, 4);
-            this.CMB_comport.Margin = new System.Windows.Forms.Padding(4);
+            this.CMB_comport.Location = new System.Drawing.Point(6, 6);
+            this.CMB_comport.Margin = new System.Windows.Forms.Padding(6, 6, 6, 6);
             this.CMB_comport.Name = "CMB_comport";
-            this.CMB_comport.Size = new System.Drawing.Size(138, 24);
+            this.CMB_comport.Size = new System.Drawing.Size(221, 33);
             this.CMB_comport.TabIndex = 0;
             this.CMB_comport.SelectedIndexChanged += new System.EventHandler(this.CMB_comport_SelectedIndexChanged);
             this.CMB_comport.Click += new System.EventHandler(this.CMB_comport_Click);
@@ -301,15 +275,15 @@
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
             this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 14.28572F));
-            this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 253F));
+            this.TopPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 416F));
             this.TopPanel.Controls.Add(this.but_connect, 1, 0);
             this.TopPanel.Controls.Add(this.AltHoldButton, 2, 1);
             this.TopPanel.Controls.Add(this.TakeOffButton, 4, 0);
             this.TopPanel.Controls.Add(this.GuidedModeButton, 2, 0);
+            this.TopPanel.Controls.Add(this.ActiveDroneComboBox, 0, 1);
             this.TopPanel.Controls.Add(this.StopFollowingShipButton, 5, 1);
             this.TopPanel.Controls.Add(this.ArmStatusBox, 3, 1);
             this.TopPanel.Controls.Add(this.CMB_comport, 0, 0);
-            this.TopPanel.Controls.Add(this.cmb_baudrate, 0, 1);
             this.TopPanel.Controls.Add(this.but_mission, 1, 1);
             this.TopPanel.Controls.Add(this.EarthquakeInfoLabel, 6, 0);
             this.TopPanel.Controls.Add(this.but_armdisarm, 3, 0);
@@ -317,7 +291,6 @@
             this.TopPanel.Controls.Add(this.RTLButton, 5, 0);
             this.TopPanel.Controls.Add(this.pictureBox1, 7, 1);
             this.TopPanel.Controls.Add(this.pictureBox2, 7, 0);
-            this.TopPanel.Controls.Add(this.ActiveDroneComboBox, 6, 1);
             this.TopPanel.Dock = System.Windows.Forms.DockStyle.Top;
             this.TopPanel.Location = new System.Drawing.Point(0, 0);
             this.TopPanel.Margin = new System.Windows.Forms.Padding(0);
@@ -326,23 +299,9 @@
             this.TopPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.TopPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.TopPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 0F));
-            this.TopPanel.Size = new System.Drawing.Size(1282, 88);
+            this.TopPanel.Size = new System.Drawing.Size(2051, 141);
             this.TopPanel.TabIndex = 16;
             this.TopPanel.Paint += new System.Windows.Forms.PaintEventHandler(this.tableLayoutPanel1_Paint);
-            // 
-            // ActiveDroneComboBox
-            // 
-            this.ActiveDroneComboBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.ActiveDroneComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.ActiveDroneComboBox.FormattingEnabled = true;
-            this.ActiveDroneComboBox.Location = new System.Drawing.Point(883, 46);
-            this.ActiveDroneComboBox.Margin = new System.Windows.Forms.Padding(2);
-            this.ActiveDroneComboBox.Name = "ActiveDroneComboBox";
-            this.ActiveDroneComboBox.Size = new System.Drawing.Size(145, 24);
-            this.ActiveDroneComboBox.TabIndex = 19;
-            this.ActiveDroneComboBox.SelectedIndexChanged += new System.EventHandler(this.ActiveDroneComboBox_SelectedIndexChanged);
             // 
             // TakeOffButton
             // 
@@ -353,16 +312,29 @@
             this.TakeOffButton.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.TakeOffButton.Cursor = System.Windows.Forms.Cursors.Default;
             this.TakeOffButton.ImageAlign = System.Drawing.ContentAlignment.BottomCenter;
-            this.TakeOffButton.Location = new System.Drawing.Point(589, 4);
-            this.TakeOffButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.TakeOffButton.Location = new System.Drawing.Point(935, 6);
+            this.TakeOffButton.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.TakeOffButton.Name = "TakeOffButton";
             this.TakeOffButton.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.TakeOffButton.Size = new System.Drawing.Size(143, 36);
+            this.TakeOffButton.Size = new System.Drawing.Size(227, 58);
             this.TakeOffButton.TabIndex = 7;
             this.TakeOffButton.Text = "TAKE OFF";
             this.TakeOffButton.TextImageRelation = System.Windows.Forms.TextImageRelation.ImageBeforeText;
             this.TakeOffButton.UseVisualStyleBackColor = false;
             this.TakeOffButton.Click += new System.EventHandler(this.button1_Click);
+            // 
+            // ActiveDroneComboBox
+            // 
+            this.ActiveDroneComboBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.ActiveDroneComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.ActiveDroneComboBox.FormattingEnabled = true;
+            this.ActiveDroneComboBox.Location = new System.Drawing.Point(3, 73);
+            this.ActiveDroneComboBox.Name = "ActiveDroneComboBox";
+            this.ActiveDroneComboBox.Size = new System.Drawing.Size(227, 33);
+            this.ActiveDroneComboBox.TabIndex = 19;
+            this.ActiveDroneComboBox.SelectedIndexChanged += new System.EventHandler(this.ActiveDroneComboBox_SelectedIndexChanged);
             // 
             // EarthquakeInfoLabel
             // 
@@ -372,10 +344,11 @@
             this.EarthquakeInfoLabel.AutoSize = true;
             this.EarthquakeInfoLabel.BackColor = System.Drawing.SystemColors.InfoText;
             this.EarthquakeInfoLabel.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.EarthquakeInfoLabel.Location = new System.Drawing.Point(883, 0);
-            this.EarthquakeInfoLabel.Margin = new System.Windows.Forms.Padding(2, 0, 0, 0);
+            this.EarthquakeInfoLabel.Location = new System.Drawing.Point(1401, 0);
+            this.EarthquakeInfoLabel.Margin = new System.Windows.Forms.Padding(3, 0, 0, 0);
             this.EarthquakeInfoLabel.Name = "EarthquakeInfoLabel";
-            this.EarthquakeInfoLabel.Size = new System.Drawing.Size(145, 44);
+            this.TopPanel.SetRowSpan(this.EarthquakeInfoLabel, 2);
+            this.EarthquakeInfoLabel.Size = new System.Drawing.Size(230, 140);
             this.EarthquakeInfoLabel.TabIndex = 15;
             this.EarthquakeInfoLabel.Text = "AIS Ship Information";
             this.EarthquakeInfoLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -387,10 +360,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.LandButton.BackColor = System.Drawing.Color.Lime;
-            this.LandButton.Location = new System.Drawing.Point(589, 46);
-            this.LandButton.Margin = new System.Windows.Forms.Padding(2);
+            this.LandButton.Location = new System.Drawing.Point(935, 73);
             this.LandButton.Name = "LandButton";
-            this.LandButton.Size = new System.Drawing.Size(143, 40);
+            this.LandButton.Size = new System.Drawing.Size(227, 64);
             this.LandButton.TabIndex = 16;
             this.LandButton.Text = "LAND";
             this.LandButton.UseVisualStyleBackColor = false;
@@ -402,10 +374,10 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.RTLButton.BackColor = System.Drawing.SystemColors.Highlight;
             this.RTLButton.ForeColor = System.Drawing.SystemColors.ControlLightLight;
-            this.RTLButton.Location = new System.Drawing.Point(736, 4);
-            this.RTLButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.RTLButton.Location = new System.Drawing.Point(1168, 6);
+            this.RTLButton.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.RTLButton.Name = "RTLButton";
-            this.RTLButton.Size = new System.Drawing.Size(143, 36);
+            this.RTLButton.Size = new System.Drawing.Size(227, 58);
             this.RTLButton.TabIndex = 17;
             this.RTLButton.Text = "RETURN TO LAUNCH";
             this.RTLButton.UseVisualStyleBackColor = false;
@@ -415,11 +387,11 @@
             // 
             this.pictureBox1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.pictureBox1.Image = global::IERAX_MissionControl.Properties.Resources.ieraxlogo;
-            this.pictureBox1.Location = new System.Drawing.Point(0, 88);
+            this.pictureBox1.Location = new System.Drawing.Point(0, 140);
             this.pictureBox1.Margin = new System.Windows.Forms.Padding(0);
-            this.pictureBox1.MaximumSize = new System.Drawing.Size(188, 0);
+            this.pictureBox1.MaximumSize = new System.Drawing.Size(301, 0);
             this.pictureBox1.Name = "pictureBox1";
-            this.pictureBox1.Size = new System.Drawing.Size(22, 0);
+            this.pictureBox1.Size = new System.Drawing.Size(35, 0);
             this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pictureBox1.TabIndex = 5;
             this.pictureBox1.TabStop = false;
@@ -431,11 +403,11 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.pictureBox2.Image = global::IERAX_MissionControl.Properties.Resources.ieraxlogo;
-            this.pictureBox2.Location = new System.Drawing.Point(1030, 4);
-            this.pictureBox2.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.pictureBox2.Location = new System.Drawing.Point(1634, 6);
+            this.pictureBox2.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.pictureBox2.Name = "pictureBox2";
             this.TopPanel.SetRowSpan(this.pictureBox2, 2);
-            this.pictureBox2.Size = new System.Drawing.Size(250, 80);
+            this.pictureBox2.Size = new System.Drawing.Size(414, 128);
             this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
             this.pictureBox2.TabIndex = 18;
             this.pictureBox2.TabStop = false;
@@ -445,8 +417,8 @@
             this.SidePanel.AutoSize = true;
             this.SidePanel.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.SidePanel.ColumnCount = 2;
-            this.SidePanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 94F));
-            this.SidePanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 94F));
+            this.SidePanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 150F));
+            this.SidePanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 150F));
             this.SidePanel.Controls.Add(this.WindSpeedLabel, 0, 11);
             this.SidePanel.Controls.Add(this.WindDirectionLabel, 0, 11);
             this.SidePanel.Controls.Add(this.label8, 1, 6);
@@ -471,24 +443,24 @@
             this.SidePanel.Controls.Add(this.label12, 1, 10);
             this.SidePanel.Controls.Add(this.BatteryRemainingLabel, 0, 9);
             this.SidePanel.Dock = System.Windows.Forms.DockStyle.Right;
-            this.SidePanel.Location = new System.Drawing.Point(1090, 88);
+            this.SidePanel.Location = new System.Drawing.Point(1745, 141);
             this.SidePanel.Margin = new System.Windows.Forms.Padding(0);
             this.SidePanel.Name = "SidePanel";
-            this.SidePanel.Padding = new System.Windows.Forms.Padding(0, 0, 4, 0);
+            this.SidePanel.Padding = new System.Windows.Forms.Padding(0, 0, 6, 0);
             this.SidePanel.RowCount = 12;
-            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 78F));
             this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 16.66666F));
-            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 78F));
             this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 16.66666F));
-            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 78F));
             this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 16.66667F));
-            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 78F));
             this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 16.66666F));
-            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 78F));
             this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 16.66666F));
-            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 78F));
             this.SidePanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 16.66666F));
-            this.SidePanel.Size = new System.Drawing.Size(192, 620);
+            this.SidePanel.Size = new System.Drawing.Size(306, 992);
             this.SidePanel.TabIndex = 17;
             this.SidePanel.Paint += new System.Windows.Forms.PaintEventHandler(this.tableLayoutPanel2_Paint);
             // 
@@ -500,10 +472,10 @@
             this.WindSpeedLabel.AutoSize = true;
             this.WindSpeedLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.WindSpeedLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.WindSpeedLabel.Location = new System.Drawing.Point(0, 564);
+            this.WindSpeedLabel.Location = new System.Drawing.Point(0, 903);
             this.WindSpeedLabel.Margin = new System.Windows.Forms.Padding(0);
             this.WindSpeedLabel.Name = "WindSpeedLabel";
-            this.WindSpeedLabel.Size = new System.Drawing.Size(94, 56);
+            this.WindSpeedLabel.Size = new System.Drawing.Size(150, 89);
             this.WindSpeedLabel.TabIndex = 37;
             this.WindSpeedLabel.Text = "Wind Speed";
             this.WindSpeedLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -516,10 +488,10 @@
             this.WindDirectionLabel.AutoSize = true;
             this.WindDirectionLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.WindDirectionLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.WindDirectionLabel.Location = new System.Drawing.Point(94, 564);
+            this.WindDirectionLabel.Location = new System.Drawing.Point(150, 903);
             this.WindDirectionLabel.Margin = new System.Windows.Forms.Padding(0);
             this.WindDirectionLabel.Name = "WindDirectionLabel";
-            this.WindDirectionLabel.Size = new System.Drawing.Size(94, 56);
+            this.WindDirectionLabel.Size = new System.Drawing.Size(150, 89);
             this.WindDirectionLabel.TabIndex = 36;
             this.WindDirectionLabel.Text = "Wind Direction";
             this.WindDirectionLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -531,10 +503,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label8.AutoSize = true;
             this.label8.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label8.Location = new System.Drawing.Point(96, 309);
-            this.label8.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label8.Location = new System.Drawing.Point(153, 495);
             this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(90, 49);
+            this.label8.Size = new System.Drawing.Size(144, 78);
             this.label8.TabIndex = 29;
             this.label8.Text = "EMPTY";
             this.label8.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -546,10 +517,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label7.AutoSize = true;
             this.label7.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label7.Location = new System.Drawing.Point(2, 309);
-            this.label7.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label7.Location = new System.Drawing.Point(3, 495);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(90, 49);
+            this.label7.Size = new System.Drawing.Size(144, 78);
             this.label7.TabIndex = 28;
             this.label7.Text = "FLIGHT MODE";
             this.label7.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -561,10 +531,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label6.AutoSize = true;
             this.label6.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label6.Location = new System.Drawing.Point(96, 206);
-            this.label6.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label6.Location = new System.Drawing.Point(153, 330);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(90, 49);
+            this.label6.Size = new System.Drawing.Size(144, 78);
             this.label6.TabIndex = 27;
             this.label6.Text = "TIME TO WP";
             this.label6.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -576,10 +545,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label5.AutoSize = true;
             this.label5.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label5.Location = new System.Drawing.Point(2, 206);
-            this.label5.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label5.Location = new System.Drawing.Point(3, 330);
             this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(90, 49);
+            this.label5.Size = new System.Drawing.Size(144, 78);
             this.label5.TabIndex = 26;
             this.label5.Text = "DISTANCE TO WP";
             this.label5.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -592,10 +560,10 @@
             this.HeadingLabel.AutoSize = true;
             this.HeadingLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.HeadingLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.HeadingLabel.Location = new System.Drawing.Point(94, 152);
+            this.HeadingLabel.Location = new System.Drawing.Point(150, 243);
             this.HeadingLabel.Margin = new System.Windows.Forms.Padding(0);
             this.HeadingLabel.Name = "HeadingLabel";
-            this.HeadingLabel.Size = new System.Drawing.Size(94, 54);
+            this.HeadingLabel.Size = new System.Drawing.Size(150, 87);
             this.HeadingLabel.TabIndex = 25;
             this.HeadingLabel.Text = "Heading";
             this.HeadingLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -607,10 +575,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label4.AutoSize = true;
             this.label4.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label4.Location = new System.Drawing.Point(96, 103);
-            this.label4.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label4.Location = new System.Drawing.Point(153, 165);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(90, 49);
+            this.label4.Size = new System.Drawing.Size(144, 78);
             this.label4.TabIndex = 24;
             this.label4.Text = "HEADING";
             this.label4.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -622,10 +589,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label3.AutoSize = true;
             this.label3.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label3.Location = new System.Drawing.Point(2, 103);
-            this.label3.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label3.Location = new System.Drawing.Point(3, 165);
             this.label3.Name = "label3";
-            this.label3.Size = new System.Drawing.Size(90, 49);
+            this.label3.Size = new System.Drawing.Size(144, 78);
             this.label3.TabIndex = 23;
             this.label3.Text = "ALTIMETER";
             this.label3.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -638,10 +604,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label2.AutoSize = true;
             this.label2.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label2.Location = new System.Drawing.Point(96, 0);
-            this.label2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label2.Location = new System.Drawing.Point(153, 0);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(90, 49);
+            this.label2.Size = new System.Drawing.Size(144, 78);
             this.label2.TabIndex = 22;
             this.label2.Text = "GROUND SPEED";
             this.label2.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -654,10 +619,9 @@
             this.DistanceToWPLabel.AutoSize = true;
             this.DistanceToWPLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.DistanceToWPLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.DistanceToWPLabel.Location = new System.Drawing.Point(2, 255);
-            this.DistanceToWPLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.DistanceToWPLabel.Location = new System.Drawing.Point(3, 408);
             this.DistanceToWPLabel.Name = "DistanceToWPLabel";
-            this.DistanceToWPLabel.Size = new System.Drawing.Size(90, 54);
+            this.DistanceToWPLabel.Size = new System.Drawing.Size(144, 87);
             this.DistanceToWPLabel.TabIndex = 18;
             this.DistanceToWPLabel.Text = "Distance to WP";
             this.DistanceToWPLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -670,10 +634,9 @@
             this.TimeToWPLabel.AutoSize = true;
             this.TimeToWPLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.TimeToWPLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.TimeToWPLabel.Location = new System.Drawing.Point(96, 255);
-            this.TimeToWPLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.TimeToWPLabel.Location = new System.Drawing.Point(153, 408);
             this.TimeToWPLabel.Name = "TimeToWPLabel";
-            this.TimeToWPLabel.Size = new System.Drawing.Size(90, 54);
+            this.TimeToWPLabel.Size = new System.Drawing.Size(144, 87);
             this.TimeToWPLabel.TabIndex = 19;
             this.TimeToWPLabel.Text = "Time To WP";
             this.TimeToWPLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -685,10 +648,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.DroneMode.AutoSize = true;
             this.DroneMode.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
-            this.DroneMode.Location = new System.Drawing.Point(2, 358);
-            this.DroneMode.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.DroneMode.Location = new System.Drawing.Point(3, 573);
             this.DroneMode.Name = "DroneMode";
-            this.DroneMode.Size = new System.Drawing.Size(90, 54);
+            this.DroneMode.Size = new System.Drawing.Size(144, 87);
             this.DroneMode.TabIndex = 17;
             this.DroneMode.Text = "Flight Controller Mode";
             this.DroneMode.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -701,10 +663,10 @@
             this.AltimeterBox.AutoSize = true;
             this.AltimeterBox.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.AltimeterBox.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.AltimeterBox.Location = new System.Drawing.Point(0, 152);
+            this.AltimeterBox.Location = new System.Drawing.Point(0, 243);
             this.AltimeterBox.Margin = new System.Windows.Forms.Padding(0);
             this.AltimeterBox.Name = "AltimeterBox";
-            this.AltimeterBox.Size = new System.Drawing.Size(94, 54);
+            this.AltimeterBox.Size = new System.Drawing.Size(150, 87);
             this.AltimeterBox.TabIndex = 16;
             this.AltimeterBox.Text = "Altimeter";
             this.AltimeterBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -717,10 +679,9 @@
             this.ASpeedLabel.AutoSize = true;
             this.ASpeedLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.ASpeedLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.ASpeedLabel.Location = new System.Drawing.Point(2, 49);
-            this.ASpeedLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.ASpeedLabel.Location = new System.Drawing.Point(3, 78);
             this.ASpeedLabel.Name = "ASpeedLabel";
-            this.ASpeedLabel.Size = new System.Drawing.Size(90, 54);
+            this.ASpeedLabel.Size = new System.Drawing.Size(144, 87);
             this.ASpeedLabel.TabIndex = 20;
             this.ASpeedLabel.Text = "AirSpeed";
             this.ASpeedLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -732,10 +693,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label1.AutoSize = true;
             this.label1.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label1.Location = new System.Drawing.Point(2, 0);
-            this.label1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label1.Location = new System.Drawing.Point(3, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(90, 49);
+            this.label1.Size = new System.Drawing.Size(144, 78);
             this.label1.TabIndex = 21;
             this.label1.Text = "AIRSPEED";
             this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -747,10 +707,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label9.AutoSize = true;
             this.label9.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label9.Location = new System.Drawing.Point(96, 412);
-            this.label9.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label9.Location = new System.Drawing.Point(153, 660);
             this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(90, 49);
+            this.label9.Size = new System.Drawing.Size(144, 78);
             this.label9.TabIndex = 31;
             this.label9.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.label9.Click += new System.EventHandler(this.label9_Click);
@@ -762,10 +721,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label.AutoSize = true;
             this.label.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label.Location = new System.Drawing.Point(2, 412);
-            this.label.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label.Location = new System.Drawing.Point(3, 660);
             this.label.Name = "label";
-            this.label.Size = new System.Drawing.Size(90, 49);
+            this.label.Size = new System.Drawing.Size(144, 78);
             this.label.TabIndex = 32;
             this.label.Text = "Battery";
             this.label.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -778,10 +736,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label11.AutoSize = true;
             this.label11.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label11.Location = new System.Drawing.Point(2, 515);
-            this.label11.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label11.Location = new System.Drawing.Point(3, 825);
             this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(90, 49);
+            this.label11.Size = new System.Drawing.Size(144, 78);
             this.label11.TabIndex = 33;
             this.label11.Text = "Wind Speed";
             this.label11.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -793,10 +750,9 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.label12.AutoSize = true;
             this.label12.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.label12.Location = new System.Drawing.Point(96, 515);
-            this.label12.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label12.Location = new System.Drawing.Point(153, 825);
             this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(90, 49);
+            this.label12.Size = new System.Drawing.Size(144, 78);
             this.label12.TabIndex = 34;
             this.label12.Text = "Wind Direction";
             this.label12.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -809,10 +765,10 @@
             this.BatteryRemainingLabel.AutoSize = true;
             this.BatteryRemainingLabel.BackColor = System.Drawing.SystemColors.GradientActiveCaption;
             this.BatteryRemainingLabel.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.BatteryRemainingLabel.Location = new System.Drawing.Point(0, 461);
+            this.BatteryRemainingLabel.Location = new System.Drawing.Point(0, 738);
             this.BatteryRemainingLabel.Margin = new System.Windows.Forms.Padding(0);
             this.BatteryRemainingLabel.Name = "BatteryRemainingLabel";
-            this.BatteryRemainingLabel.Size = new System.Drawing.Size(94, 54);
+            this.BatteryRemainingLabel.Size = new System.Drawing.Size(150, 87);
             this.BatteryRemainingLabel.TabIndex = 35;
             this.BatteryRemainingLabel.Text = "Battery";
             this.BatteryRemainingLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -840,14 +796,14 @@
             this.BottomPanel.Controls.Add(this.cameraButton, 4, 2);
             this.BottomPanel.Controls.Add(this.button1, 5, 1);
             this.BottomPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.BottomPanel.Location = new System.Drawing.Point(0, 534);
-            this.BottomPanel.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.BottomPanel.Location = new System.Drawing.Point(0, 855);
+            this.BottomPanel.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.BottomPanel.Name = "BottomPanel";
             this.BottomPanel.RowCount = 3;
             this.BottomPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 15.61181F));
             this.BottomPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 42.1941F));
             this.BottomPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 42.1941F));
-            this.BottomPanel.Size = new System.Drawing.Size(1090, 174);
+            this.BottomPanel.Size = new System.Drawing.Size(1745, 278);
             this.BottomPanel.TabIndex = 20;
             this.BottomPanel.Paint += new System.Windows.Forms.PaintEventHandler(this.BottomPanel_Paint);
             // 
@@ -858,10 +814,9 @@
             this.label16.Dock = System.Windows.Forms.DockStyle.Fill;
             this.label16.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.label16.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.label16.Location = new System.Drawing.Point(472, 0);
-            this.label16.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label16.Location = new System.Drawing.Point(757, 0);
             this.label16.Name = "label16";
-            this.label16.Size = new System.Drawing.Size(250, 27);
+            this.label16.Size = new System.Drawing.Size(401, 43);
             this.label16.TabIndex = 32;
             this.label16.Text = "ECOMTREK";
             this.label16.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -873,10 +828,9 @@
             this.label13.BackColor = System.Drawing.SystemColors.MenuHighlight;
             this.label13.Dock = System.Windows.Forms.DockStyle.Fill;
             this.label13.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.label13.Location = new System.Drawing.Point(291, 0);
-            this.label13.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label13.Location = new System.Drawing.Point(467, 0);
             this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(177, 27);
+            this.label13.Size = new System.Drawing.Size(284, 43);
             this.label13.TabIndex = 23;
             this.label13.Text = "CO2 HD";
             this.label13.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -887,10 +841,9 @@
             this.label10.BackColor = System.Drawing.SystemColors.MenuHighlight;
             this.label10.Dock = System.Windows.Forms.DockStyle.Fill;
             this.label10.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.label10.Location = new System.Drawing.Point(110, 0);
-            this.label10.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label10.Location = new System.Drawing.Point(177, 0);
             this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(177, 27);
+            this.label10.Size = new System.Drawing.Size(284, 43);
             this.label10.TabIndex = 22;
             this.label10.Text = "CO2";
             this.label10.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -900,10 +853,9 @@
             this.label14.AutoSize = true;
             this.label14.BackColor = System.Drawing.Color.Chartreuse;
             this.label14.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label14.Location = new System.Drawing.Point(2, 27);
-            this.label14.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label14.Location = new System.Drawing.Point(3, 43);
             this.label14.Name = "label14";
-            this.label14.Size = new System.Drawing.Size(104, 73);
+            this.label14.Size = new System.Drawing.Size(168, 117);
             this.label14.TabIndex = 24;
             this.label14.Text = "INSTANT";
             this.label14.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -913,10 +865,9 @@
             this.label15.AutoSize = true;
             this.label15.BackColor = System.Drawing.Color.Tomato;
             this.label15.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label15.Location = new System.Drawing.Point(2, 100);
-            this.label15.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label15.Location = new System.Drawing.Point(3, 160);
             this.label15.Name = "label15";
-            this.label15.Size = new System.Drawing.Size(104, 74);
+            this.label15.Size = new System.Drawing.Size(168, 118);
             this.label15.TabIndex = 25;
             this.label15.Text = "MAX READING";
             this.label15.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -925,10 +876,10 @@
             // 
             this.pictureBox3.BackgroundImage = global::IERAX_MissionControl.Properties.Resources.Screenshot_1;
             this.pictureBox3.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-            this.pictureBox3.Location = new System.Drawing.Point(2, 4);
-            this.pictureBox3.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.pictureBox3.Location = new System.Drawing.Point(3, 6);
+            this.pictureBox3.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.pictureBox3.Name = "pictureBox3";
-            this.pictureBox3.Size = new System.Drawing.Size(71, 19);
+            this.pictureBox3.Size = new System.Drawing.Size(114, 30);
             this.pictureBox3.TabIndex = 26;
             this.pictureBox3.TabStop = false;
             // 
@@ -939,10 +890,9 @@
             this.txtCO2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtCO2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.txtCO2.ForeColor = System.Drawing.Color.Black;
-            this.txtCO2.Location = new System.Drawing.Point(110, 27);
-            this.txtCO2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.txtCO2.Location = new System.Drawing.Point(177, 43);
             this.txtCO2.Name = "txtCO2";
-            this.txtCO2.Size = new System.Drawing.Size(177, 73);
+            this.txtCO2.Size = new System.Drawing.Size(284, 117);
             this.txtCO2.TabIndex = 27;
             this.txtCO2.Text = "CO2 READINGS";
             this.txtCO2.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -955,10 +905,9 @@
             this.txtHDCO2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtHDCO2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.txtHDCO2.ForeColor = System.Drawing.Color.Black;
-            this.txtHDCO2.Location = new System.Drawing.Point(291, 27);
-            this.txtHDCO2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.txtHDCO2.Location = new System.Drawing.Point(467, 43);
             this.txtHDCO2.Name = "txtHDCO2";
-            this.txtHDCO2.Size = new System.Drawing.Size(177, 73);
+            this.txtHDCO2.Size = new System.Drawing.Size(284, 117);
             this.txtHDCO2.TabIndex = 28;
             this.txtHDCO2.Text = "CO2 READINGS";
             this.txtHDCO2.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -970,10 +919,9 @@
             this.txtCO2max.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtCO2max.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.txtCO2max.ForeColor = System.Drawing.Color.Black;
-            this.txtCO2max.Location = new System.Drawing.Point(110, 100);
-            this.txtCO2max.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.txtCO2max.Location = new System.Drawing.Point(177, 160);
             this.txtCO2max.Name = "txtCO2max";
-            this.txtCO2max.Size = new System.Drawing.Size(177, 74);
+            this.txtCO2max.Size = new System.Drawing.Size(284, 118);
             this.txtCO2max.TabIndex = 29;
             this.txtCO2max.Text = "CO2 READINGS";
             this.txtCO2max.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -985,10 +933,9 @@
             this.txtHDCO2max.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtHDCO2max.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
             this.txtHDCO2max.ForeColor = System.Drawing.Color.Black;
-            this.txtHDCO2max.Location = new System.Drawing.Point(291, 100);
-            this.txtHDCO2max.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.txtHDCO2max.Location = new System.Drawing.Point(467, 160);
             this.txtHDCO2max.Name = "txtHDCO2max";
-            this.txtHDCO2max.Size = new System.Drawing.Size(177, 74);
+            this.txtHDCO2max.Size = new System.Drawing.Size(284, 118);
             this.txtHDCO2max.TabIndex = 30;
             this.txtHDCO2max.Text = "CO2 READINGS";
             this.txtHDCO2max.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -999,10 +946,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.analyzerBT.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
-            this.analyzerBT.Location = new System.Drawing.Point(726, 29);
-            this.analyzerBT.Margin = new System.Windows.Forms.Padding(2);
+            this.analyzerBT.Location = new System.Drawing.Point(1164, 46);
             this.analyzerBT.Name = "analyzerBT";
-            this.analyzerBT.Size = new System.Drawing.Size(177, 69);
+            this.analyzerBT.Size = new System.Drawing.Size(284, 111);
             this.analyzerBT.TabIndex = 31;
             this.analyzerBT.Text = "ANALYZER";
             this.analyzerBT.UseVisualStyleBackColor = true;
@@ -1013,10 +959,10 @@
             this.cameraButton.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.cameraButton.Location = new System.Drawing.Point(726, 104);
-            this.cameraButton.Margin = new System.Windows.Forms.Padding(2, 4, 2, 4);
+            this.cameraButton.Location = new System.Drawing.Point(1164, 166);
+            this.cameraButton.Margin = new System.Windows.Forms.Padding(3, 6, 3, 6);
             this.cameraButton.Name = "cameraButton";
-            this.cameraButton.Size = new System.Drawing.Size(177, 66);
+            this.cameraButton.Size = new System.Drawing.Size(284, 106);
             this.cameraButton.TabIndex = 21;
             this.cameraButton.Text = "CAMERA";
             this.cameraButton.UseVisualStyleBackColor = true;
@@ -1028,10 +974,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.button1.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(161)));
-            this.button1.Location = new System.Drawing.Point(907, 29);
-            this.button1.Margin = new System.Windows.Forms.Padding(2);
+            this.button1.Location = new System.Drawing.Point(1454, 46);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(181, 69);
+            this.button1.Size = new System.Drawing.Size(288, 111);
             this.button1.TabIndex = 33;
             this.button1.Text = "START MEASURING";
             this.button1.UseVisualStyleBackColor = true;
@@ -1039,15 +984,15 @@
             // 
             // MPIeraxMain
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(120F, 120F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(192F, 192F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
-            this.ClientSize = new System.Drawing.Size(1282, 708);
+            this.ClientSize = new System.Drawing.Size(2051, 1133);
             this.Controls.Add(this.BottomPanel);
             this.Controls.Add(this.SidePanel);
             this.Controls.Add(this.TopPanel);
             this.Controls.Add(this.gMapControl1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Margin = new System.Windows.Forms.Padding(4);
+            this.Margin = new System.Windows.Forms.Padding(6, 6, 6, 6);
             this.Name = "MPIeraxMain";
             this.Text = "IERAX MISSION CONTROL v1.1";
             this.Load += new System.EventHandler(this.MPIeraxMain_Load);
@@ -1077,7 +1022,6 @@
         private System.Windows.Forms.Button but_mission;
         private System.Windows.Forms.Label ShipFollowingModeLabel;
         private System.Windows.Forms.Button but_connect;
-        private System.Windows.Forms.ComboBox cmb_baudrate;
         private System.Windows.Forms.ComboBox CMB_comport;
         private System.Windows.Forms.TableLayoutPanel TopPanel;
         private System.Windows.Forms.TableLayoutPanel SidePanel;
