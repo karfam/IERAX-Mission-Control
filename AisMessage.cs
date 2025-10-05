@@ -74,6 +74,16 @@ namespace IERAX_MissionControl
         public AisMessage Message { get; set; }
         public string MessageType { get; set; }
         public MetaData MetaData { get; set; }
+
+    }
+
+    public class TestShip
+    {
+        public long Mmsi { get; set; }
+        public string Name { get; set; } = "";
+        public double RadiusNm { get; set; }
+        public double AngleDeg { get; set; }
+        public double Sog { get; set; }
     }
 
 }

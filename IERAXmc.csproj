@@ -211,6 +211,7 @@
     </Compile>
     <Compile Include="GlobalSensorStats.cs" />
     <Compile Include="GMapMarkerImage.cs" />
+    <Compile Include="HeatmapGrid.cs" />
     <Compile Include="HistoryMarker.cs" />
     <Compile Include="InterceptMarker.cs" />
     <Compile Include="MagnitudeCircleMarker.cs" />

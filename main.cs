@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data.Entity.Core.Common.CommandTrees.ExpressionBuilder;
 using System.Drawing;
 using System.IO;
 using System.IO.Ports;
@@ -21,6 +22,7 @@ using GMap.NET.WindowsForms.Markers;
 using IERAX_MissionControl.Properties;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using static IERAX_MissionControl.HeatmapGrid;
 using static MAVLink;
 
 
@@ -57,6 +59,7 @@ namespace IERAX_MissionControl
         private string maxCO2Timestamp = string.Empty;
 
         private GMapOverlay plansOverlay;
+        private GMapOverlay _debugOverlay;
 
 
         private float maxHDCO2 = float.MinValue;
@@ -78,6 +81,13 @@ namespace IERAX_MissionControl
         public static float InstantCO2 { get; set; }
         public static float InstantHDCO2 { get; set; }
 
+        // Heatmap runtime
+        private System.Windows.Forms.Timer _heatTimer;
+        private bool _heatEnabled;
+        private double _heatMinPpm = 400, _heatMaxPpm = 15000;
+        private double _gaussianRadiusM = 0.0; // 0 = hard binning, >0 = smoothing
+
+
         private GMapOverlay quakesOverlay;
         private System.Windows.Forms.Timer quakeTimer;
 
@@ -96,6 +106,8 @@ namespace IERAX_MissionControl
 
         private System.Windows.Forms.Timer droneNavigationTimer;
         private DroneFlightMode currentMode = DroneFlightMode.None;
+
+        private HeatmapGrid _heat;
 
         private Task<bool> SetModeGuidedAsyncForActiveCtx() => SendDoSetModeAsync(4); // GUIDED
         private Task<bool> SetModeAutoAsyncForActiveCtx() => SendDoSetModeAsync(3); // AUTO
@@ -138,6 +150,9 @@ namespace IERAX_MissionControl
             public bool? LastIsArmedFromHb { get; set; } // optional dedupe
             public string LastModeName { get; set; }     // e.g., "GUIDED", "AUTO"
             public DateTime LastHeartbeatUtc { get; set; } = DateTime.MinValue;
+
+      
+
         }
 
         // All active drone connections by connectionId
@@ -235,38 +250,57 @@ namespace IERAX_MissionControl
         }
 
 
-       public async Task StartVolcanoHeatmapAsync()
-{
-    try
-    {
-        if (_quadrantPaths.Count == 0)
-            GenerateAndDrawQuadrantPaths();
-
-        // Validate active link
-        if (string.IsNullOrEmpty(_activeConnectionId) ||
-            !_connections.TryGetValue(_activeConnectionId, out var ctx) ||
-            !ctx.IsConnected || ctx.Stream == null || !ctx.Stream.CanWrite)
+        public async Task StartVolcanoHeatmapAsync()
         {
-            MessageBox.Show("No active MAVLink connection.", "Volcano Heatmap",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
+            
+            try
+            {
+                if (_quadrantPaths.Count == 0)
+                {
+                    Console.WriteLine("[HEATMAP] Generating quadrant paths...");
+                    GenerateAndDrawQuadrantPaths();
+                }
 
-        var dronePos = GetDroneCurrentPosition();
-        if (double.IsNaN(dronePos.Lat) || double.IsNaN(dronePos.Lng) ||
-            (Math.Abs(dronePos.Lat) < 1e-6 && Math.Abs(dronePos.Lng) < 1e-6))
-        {
-            MessageBox.Show("Active drone position not available.", "Volcano Heatmap",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
+                // Validate active link
+                if (string.IsNullOrEmpty(_activeConnectionId) ||
+                    !_connections.TryGetValue(_activeConnectionId, out var ctx) ||
+                    !ctx.IsConnected || ctx.Stream == null || !ctx.Stream.CanWrite)
+                {
+                    Console.WriteLine("[HEATMAP] No active MAVLink connection.");
+                    MessageBox.Show("No active MAVLink connection.", "Volcano Heatmap",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
-        // Compute closest corner
-        double overallCenterLat = 36.4044;
-        double overallCenterLon = 25.3975;
-        double quadSize = 1000.0; // meters
+                var dronePos = GetDroneCurrentPosition();
 
-        var refs = new Dictionary<Corner, PointLatLng>
+                Console.WriteLine($"[HEATMAP] Drone position: {dronePos.Lat:F6}, {dronePos.Lng:F6}");
+                Console.WriteLine($"[HEATMAP] InstantCO2: {InstantCO2:F1} ppm");
+
+                // Update heatmap immediately
+                if (_heat == null)
+                {
+                    Console.WriteLine("[HEATMAP] Heatmap not initialized — skipping update.");
+                }
+               
+                EnsureHeatmapTimerRunning();
+              
+
+                if (double.IsNaN(dronePos.Lat) || double.IsNaN(dronePos.Lng) ||
+                    (Math.Abs(dronePos.Lat) < 1e-6 && Math.Abs(dronePos.Lng) < 1e-6))
+                {
+                    Console.WriteLine("[HEATMAP] Invalid or missing drone position.");
+                    MessageBox.Show("Active drone position not available.", "Volcano Heatmap",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Compute closest corner
+                double overallCenterLat = 36.4044;
+                double overallCenterLon = 25.3975;
+                double quadSize = 1000.0; // meters
+
+                var refs = new Dictionary<Corner, PointLatLng>
         {
             { Corner.NW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2,  quadSize/2) },
             { Corner.NE, ToLatLon(overallCenterLat, overallCenterLon,  quadSize/2,  quadSize/2) },
@@ -274,61 +308,80 @@ namespace IERAX_MissionControl
             { Corner.SW, ToLatLon(overallCenterLat, overallCenterLon, -quadSize/2, -quadSize/2) },
         };
 
-        var chosenCorner = refs
-            .Select(kvp => new { kvp.Key, Dist = GetDistance(dronePos, kvp.Value) })
-            .OrderBy(x => x.Dist)
-            .First().Key;
+                var chosenCorner = refs
+                    .Select(kvp => new { kvp.Key, Dist = GetDistance(dronePos, kvp.Value) })
+                    .OrderBy(x => x.Dist)
+                    .First().Key;
 
-        if (!_quadrantPaths.TryGetValue(chosenCorner, out var chosenPath) ||
-            chosenPath == null || chosenPath.Count == 0)
-        {
-            MessageBox.Show($"No path cached for {chosenCorner}.", "Volcano Heatmap",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+                Console.WriteLine($"[HEATMAP] Closest corner: {chosenCorner}");
+
+                if (!_quadrantPaths.TryGetValue(chosenCorner, out var chosenPath) ||
+                    chosenPath == null || chosenPath.Count == 0)
+                {
+                    Console.WriteLine($"[HEATMAP] No path cached for {chosenCorner}.");
+                    MessageBox.Show($"No path cached for {chosenCorner}.", "Volcano Heatmap",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var startWp = chosenPath[0];
+                Console.WriteLine($"[HEATMAP] Starting waypoint: {startWp.Lat:F6}, {startWp.Lng:F6}");
+
+                // Ensure GUIDED + armed
+                Console.WriteLine("[HEATMAP] Setting mode GUIDED...");
+                await SendDoSetModeAsync(4); // GUIDED
+                await WaitUntilModeIsAsync("GUIDED", 3000);
+
+                if (!ctx.IsArmed)
+                {
+                    Console.WriteLine("[HEATMAP] Arming drone...");
+                    await ArmIfNeededAsyncForActiveCtx(true);
+                    await WaitUntilArmedAsync(true, 6000);
+                }
+
+                // Takeoff if on ground
+                double relAlt = GetLastRelativeAltitudeMeters();
+                Console.WriteLine($"[HEATMAP] Relative altitude: {relAlt:F1} m");
+
+                if (double.IsNaN(relAlt) || relAlt < 2.0)
+                {
+                    Console.WriteLine("[HEATMAP] Taking off to 15 m...");
+                    var okTo = await GuidedTakeoffAsync(altRelM: 15f);
+                    if (!okTo)
+                    {
+                        Console.WriteLine("[HEATMAP] Aborting: takeoff failed.");
+                        return;
+                    }
+                }
+
+                // Fly to start corner using streaming set-position
+                Console.WriteLine("[HEATMAP] Flying to start corner...");
+                bool reached = await FlyGuidedToAsyncStreaming(
+                    startWp.Lat, startWp.Lng, altRelM: 120f, stopMeters: 5, hz: 3, timeoutSec: 90);
+
+                if (!reached)
+                    Console.WriteLine("[HEATMAP] WARN: did not reach start corner within timeout; continuing anyway.");
+
+                // Upload mission and start AUTO
+                Console.WriteLine("[HEATMAP] Uploading mission...");
+                await UploadMissionAsyncForActiveCtx(chosenPath, altRelMeters: 120f);
+                Console.WriteLine("[HEATMAP] Starting mission AUTO...");
+                await StartMissionAsyncForActiveCtx(startIndex: 0);
+                await SetModeAutoAsyncForActiveCtx();
+                await WaitUntilModeIsAsync("AUTO", 3000);
+
+                Console.WriteLine($"[HEATMAP] Mission started from {chosenCorner} corner.");
+                MessageBox.Show($"Starting heatmap from {chosenCorner} corner.", "Volcano Heatmap",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[HEATMAP] ERROR: {ex}");
+                MessageBox.Show($"Failed to start volcano heatmap: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        var startWp = chosenPath[0];
-
-        // Ensure GUIDED + armed
-        await SendDoSetModeAsync(4); // GUIDED
-        await WaitUntilModeIsAsync("GUIDED", 3000);
-
-        if (!ctx.IsArmed)
-        {
-            await ArmIfNeededAsyncForActiveCtx(true);
-            await WaitUntilArmedAsync(true, 6000);
-        }
-
-        // Takeoff if on ground
-        double relAlt = GetLastRelativeAltitudeMeters();
-        if (double.IsNaN(relAlt) || relAlt < 2.0)
-        {
-            var okTo = await GuidedTakeoffAsync(altRelM: 15f);
-            if (!okTo) { Console.WriteLine("Aborting: takeoff failed."); return; }
-        }
-
-        // Fly to start corner using streaming set-position
-        bool reached = await FlyGuidedToAsyncStreaming(
-            startWp.Lat, startWp.Lng, altRelM: 120f, stopMeters: 5, hz: 3, timeoutSec: 90);
-
-        if (!reached)
-            Console.WriteLine("WARN: did not reach start corner within timeout; continuing to upload mission.");
-
-        // Upload mission and start AUTO
-        await UploadMissionAsyncForActiveCtx(chosenPath, altRelMeters: 120f);
-        await StartMissionAsyncForActiveCtx(startIndex: 0);
-        await SetModeAutoAsyncForActiveCtx();
-        await WaitUntilModeIsAsync("AUTO", 3000);
-
-        MessageBox.Show($"Starting heatmap from {chosenCorner} corner.", "Volcano Heatmap",
-            MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-    catch (Exception ex)
-    {
-        MessageBox.Show($"Failed to start volcano heatmap: {ex.Message}", "Error",
-            MessageBoxButtons.OK, MessageBoxIcon.Error);
-    }
-}
 
 
         private double GetLastRelativeAltitudeMeters()
@@ -439,6 +492,9 @@ namespace IERAX_MissionControl
             }
         }
 
+        
+
+
         public async Task<bool> GuidedTakeoffAsync(float altRelM)
         {
             await SendDoSetModeAsync(4);
@@ -544,6 +600,8 @@ namespace IERAX_MissionControl
             var pkt = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, cmd);
             SendPacket(pkt);
         }
+
+
 
         // Optional: poll until close enough
         private async Task WaitUntilNearAsync(PointLatLng target, double meters = 5, int pollMs = 500, int timeoutSec = 45)
@@ -1026,6 +1084,8 @@ namespace IERAX_MissionControl
         {
             ConfigureMap();
 
+           
+
             markersOverlay = new GMapOverlay("markers");
             gMapControl1.Overlays.Add(markersOverlay);
 
@@ -1135,14 +1195,97 @@ namespace IERAX_MissionControl
             }
         }
 
-
-
-
         private async void InitializeWebSocket()
         {
             ws = new ClientWebSocket();
             cts = new CancellationTokenSource();
             await ConnectWebSocket();
+        }
+
+        private static AisData MakeTestAisData(
+         string mmsi, string name,
+         double lat, double lon,
+         double cogDeg, double sogKnots, int trueHeadingDeg,
+         bool useClassB = true)
+            {
+                var data = new AisData
+                {
+                    MetaData = new MetaData
+                    {
+                        MMSI = mmsi,
+                        ShipName = name,
+                        Latitude = lat,
+                        Longitude = lon
+                    },
+                    MessageType = useClassB ? "StandardClassBPositionReport" : "PositionReport",
+                    Message = new AisMessage()
+                };
+
+                if (useClassB)
+                {
+                    data.Message.StandardClassBPositionReport = new StandardClassBPositionReport
+                    {
+                        Latitude = lat,
+                        Longitude = lon,
+                        Cog = cogDeg,
+                        Sog = sogKnots,
+                        TrueHeading = trueHeadingDeg, // use 511 if unknown
+                        Timestamp = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                        PositionAccuracy = true
+                    };
+                }
+                else
+                {
+                    data.Message.PositionReport = new PositionReport
+                    {
+                        Latitude = lat,
+                        Longitude = lon,
+                        Cog = cogDeg,
+                        Sog = sogKnots,
+                        TrueHeading = trueHeadingDeg, // use 511 if unknown
+                        Timestamp = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                        PositionAccuracy = true
+                    };
+                }
+
+                // Optional: static info (your UpdateShipPosition doesn't use it yet)
+                data.Message.ShipStaticData = new ShipStaticData
+                {
+                    Type = 70,          // e.g., Cargo (adjust as needed)
+                    Name = name,
+                    CallSign = "TEST",
+                    ImoNumber = 0
+                };
+
+                return data;
+        }
+
+        private void SendTestShipsOnce()
+        {
+            // Santorini caldera center
+            double calderaLat = 36.4044;
+            double calderaLon = 25.3975;
+
+            // ~0.01° lat ≈ ~1.1 km. Tweak offsets as you like.
+            var testShips = new List<AisData>
+    {
+        MakeTestAisData("240000001", "CALDERA STAR",
+            calderaLat + 0.010, calderaLon + 0.022,  30, 1.5,  32, useClassB: true),
+
+        MakeTestAisData("240000002", "THIRA PRINCESS",
+            calderaLat - 0.008, calderaLon + 0.024, 270,  1.0, 268, useClassB: false),
+
+        MakeTestAisData("240000003", "NEA KAMENI",
+            calderaLat + 0.006, calderaLon + 0.016, 180, 1.2, 183, useClassB: true),
+
+        MakeTestAisData("240000004", "ATLANTIS II",
+            calderaLat - 0.012, calderaLon + 0.012,  45,  2.5,  47, useClassB: false),
+    };
+
+            foreach (var s in testShips)
+            {
+                UpdateShipPosition(s); // your existing method
+            }
         }
 
         private async Task ConnectWebSocket()
@@ -1161,10 +1304,12 @@ namespace IERAX_MissionControl
 
                 CancellationTokenSource source = new CancellationTokenSource();
                 CancellationToken token = source.Token;
+           
                 using (var ws = new ClientWebSocket())
                 {
                     await ws.ConnectAsync(new Uri("wss://stream.aisstream.io/v0/stream"), token);
                     await ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes($"{{ \"APIKey\": \"beed537a556c9f2d4ad315da0381c2f5ee168aa1\", \"BoundingBoxes\": [{boundingBoxString}] }}")), WebSocketMessageType.Text, true, token);
+                    SendTestShipsOnce();
                     byte[] buffer = new byte[4096];
                     while (ws.State == WebSocketState.Open)
                     {
@@ -1209,6 +1354,23 @@ namespace IERAX_MissionControl
 
             // Refresh the map to ensure the marker is displayed
             gMapControl1.Refresh();
+
+            double centerLat = 36.4044;
+            double centerLon = 25.3975;
+
+            // Create once
+            if (_heat == null)
+            {
+                _heat = new HeatmapGrid(centerLat, centerLon, sizeMeters: 2000.0, cellMeters: 250.0, map: gMapControl1); // <-- your GMapControl name
+                _heat.SetAggregation(HeatAggregation.Max);
+            }
+
+            if (_debugOverlay == null)
+            {
+                _debugOverlay = new GMapOverlay("heat_debug");
+                gMapControl1.Overlays.Add(_debugOverlay);
+            }
+
 
         }
 
@@ -1829,7 +1991,7 @@ namespace IERAX_MissionControl
                                     UpdateArmStatusBox(isArmed);
                             }
 
-                            Console.WriteLine($"[HB] sys={message.sysid} armed={isArmed} base_mode={hb.base_mode} custom_mode={hb.custom_mode}");
+                            //Console.WriteLine($"[HB] sys={message.sysid} armed={isArmed} base_mode={hb.base_mode} custom_mode={hb.custom_mode}");
                         }
 
                         // Done with HEARTBEAT; move to next message
@@ -1880,12 +2042,12 @@ namespace IERAX_MissionControl
                     else if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.MISSION_REQUEST_INT)
                     {
                         var req = (MAVLink.mavlink_mission_request_int_t)message.data;
-                        Console.WriteLine($"RX MISSION_REQUEST_INT seq={req.seq}");
+                       // Console.WriteLine($"RX MISSION_REQUEST_INT seq={req.seq}");
                     }
                     else if (message.msgid == (byte)MAVLink.MAVLINK_MSG_ID.MISSION_ACK)
                     {
                         var mack = (MAVLink.mavlink_mission_ack_t)message.data;
-                        Console.WriteLine($"RX MISSION_ACK type={(MAVLink.MAV_MISSION_RESULT)mack.type}");
+                       // Console.WriteLine($"RX MISSION_ACK type={(MAVLink.MAV_MISSION_RESULT)mack.type}");
                     }
                 }
                 catch (Exception ex)
@@ -2102,10 +2264,57 @@ namespace IERAX_MissionControl
         // NEW: Show distances from active drone to each quadrant reference (NW, NE, SE, SW)
         public void startVolcanoHeatmap()
         {
+            _heat.Clear();
             _ = StartVolcanoHeatmapAsync();
         }
 
+        private void EnsureHeatmapTimerRunning()
+        {
+            if (_heatTimer == null)
+            {
+                _heatTimer = new System.Windows.Forms.Timer();
+                _heatTimer.Interval = 500; // ~2 Hz. Use 200ms for 5 Hz if you like
+                _heatTimer.Tick += HeatTimer_Tick;
+            }
+            if (!_heatTimer.Enabled)
+            {
+                _heatEnabled = true;
+                _heatTimer.Start();
+                Console.WriteLine("[HEATMAP] Timer started.");
+            }
+        }
 
+        private void StopHeatmapTimer()
+        {
+            if (_heatTimer != null && _heatTimer.Enabled)
+            {
+                _heatTimer.Stop();
+                _heatEnabled = false;
+                Console.WriteLine("[HEATMAP] Timer stopped.");
+            }
+        }
+
+
+
+        private void HeatTimer_Tick(object sender, EventArgs e)
+        {
+            if (!_heatEnabled || _heat == null) return;
+
+            var pos = GetDroneCurrentPosition();
+            if (double.IsNaN(pos.Lat) || double.IsNaN(pos.Lng)) return;
+
+            double value = InstantCO2; // your live sensor ppm
+
+            // Ingest and recolor
+            _heat.AddSample(pos.Lat, pos.Lng, value, _gaussianRadiusM);
+            _heat.Recolor(minValue: _heatMinPpm, maxValue: _heatMaxPpm, maxAlpha: 150);
+
+            // Force redraw
+            gMapControl1.Refresh();
+
+            // Debug
+            Console.WriteLine($"[HEATMAP] Tick: lat={pos.Lat:F6}, lon={pos.Lng:F6}, CO2={value:F1}");
+        }
 
 
 
@@ -2295,7 +2504,7 @@ namespace IERAX_MissionControl
                 req3.type = 0;
 
                 packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.MISSION_ACK, req3);
-                Console.WriteLine("MISSION_ACK send");
+                //Console.WriteLine("MISSION_ACK send");
                 serialPort1.Write(packet, 0, packet.Length);
             }
         }
@@ -2634,6 +2843,8 @@ namespace IERAX_MissionControl
         }
 
 
+       
+
         private void ShowShipInfo(ShipMarker marker)
         {
             if (marker != null)
@@ -2807,7 +3018,7 @@ namespace IERAX_MissionControl
                         ctx.Stream.Flush();
                     }
                     byte msgid = (packet.Length > 6 && packet[0] == 0xFE) ? packet[5] : (byte)0xFF;
-                    Console.WriteLine($"TX [{ctx.ConnectionId}] msgid={msgid} len={packet.Length} {note ?? ""}");
+                   // Console.WriteLine($"TX [{ctx.ConnectionId}] msgid={msgid} len={packet.Length} {note ?? ""}");
                 }
                 else if (!isTcpConnection && serialPort1.IsOpen)
                 {
@@ -2816,11 +3027,11 @@ namespace IERAX_MissionControl
                         serialPort1.Write(packet, 0, packet.Length);
                     }
                     byte msgid = (packet.Length > 6 && packet[0] == 0xFE) ? packet[5] : (byte)0xFF;
-                    Console.WriteLine($"TX [Serial] msgid={msgid} len={packet.Length} {note ?? ""}");
+                   // Console.WriteLine($"TX [Serial] msgid={msgid} len={packet.Length} {note ?? ""}");
                 }
                 else
                 {
-                    Console.WriteLine("TX FAIL: No valid connection available.");
+                  //  Console.WriteLine("TX FAIL: No valid connection available.");
                 }
             }
             catch (Exception ex)
@@ -3877,6 +4088,8 @@ namespace IERAX_MissionControl
 
             return path;
         }
+
+
 
 
 
