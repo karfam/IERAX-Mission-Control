@@ -2628,6 +2628,16 @@ namespace IERAX_MissionControl
                 // Add a menu item for showing the coordinates
                 contextMenu.Items.Add($"Latitude: {point.Lat:F6}, Longitude: {point.Lng:F6}", null);
 
+                // Add "Simple Measure Area" item
+                ToolStripMenuItem simpleMeasureMenuItem = new ToolStripMenuItem("Simple Measure Location");
+                simpleMeasureMenuItem.Click += (sender, e) => FlyToLocation(point, 25);
+                contextMenu.Items.Add(simpleMeasureMenuItem);
+
+                // Add "Enchanced Measure Area" item
+                ToolStripMenuItem enchanceMeasureMenuItem = new ToolStripMenuItem("Enchance Measure location");
+                enchanceMeasureMenuItem.Click += (sender, e) => FlyToLocation(point, 25);
+                contextMenu.Items.Add(enchanceMeasureMenuItem);
+
                 // Add "Fly to this location" item
                 ToolStripMenuItem flyToMenuItem = new ToolStripMenuItem("Fly to this location");
                 flyToMenuItem.Click += (sender, e) => FlyToLocation(point,25);
